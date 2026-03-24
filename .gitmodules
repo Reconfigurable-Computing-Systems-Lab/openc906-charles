@@ -1,0 +1,3 @@
+[submodule "csi-nn2"]
+	path = csi-nn2
+	url = https://github.com/charlesjiangxm/csi-nn2.git
