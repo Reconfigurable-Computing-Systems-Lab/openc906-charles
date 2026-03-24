@@ -23,10 +23,10 @@ limitations under the License.
 //config the interrupt controller
 void ck_intc_init()
 {
-	int *picr = TCIP_BASE;
+	int *picr = (int *)TCIP_BASE;
         *picr = 0x0;
         
         // Write ISER
-        int *piser = CLIC_BASE+INTIE+0x10;
+        int *piser = (int *)(CLIC_BASE+INTIE+0x10);
         *piser = 0x810000;
 }

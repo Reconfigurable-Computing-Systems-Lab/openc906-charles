@@ -32,7 +32,7 @@ int get_vtimer()
 void sim_end()
 {
   int *END_ADDR;
-  END_ADDR = 0x6000FFF8;
+  END_ADDR = (int *)0x6000FFF8;
   unsigned int END_DATA;
   END_DATA= 0xffff0000;
   *END_ADDR = END_DATA;

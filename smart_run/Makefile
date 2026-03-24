@@ -140,7 +140,8 @@ endif
 
 # Execute all cases
 regress:
-	rm -rf ./tests/regress/regress_result/*
+	rm -rf ./tests/regress/regress_result
+	mkdir -p ./tests/regress/regress_result
 	@(for case in $(CASE_LIST) ; do \
 	 rm -rf ./work/* ; \
 	 make -s runcase CASE=$$case; \
