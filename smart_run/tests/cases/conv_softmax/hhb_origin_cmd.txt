@@ -1,0 +1,1 @@
+/usr/local/bin/hhb -S --model-file conv_softmax_model.onnx --board c906 --input-name input --output-name output --input-shape 1 16 28 28 --calibrate-dataset random_input.npz --simulate-data random_input.npz --quantization-scheme int8_asym --without-preprocess -o hhb_out --verbose

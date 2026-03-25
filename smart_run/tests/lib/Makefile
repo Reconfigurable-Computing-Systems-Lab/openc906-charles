@@ -52,6 +52,8 @@ else
   CFLAGS += -c -O2
 endif
 
+CFLAGS += ${EXTRA_CFLAGS}
+
 LINKFLAGS = -Tlinker.lcf -nostartfiles ${FLAG_MARCH} ${FLAG_ABI}
 
 # LINKLIBS  = -L${TOOL_PATH}/lib/gcc/riscv64-unknown-elf/8.1.0/rv32imac
@@ -74,7 +76,7 @@ HEXFLAGS	= -O srec
 	${CC} -c ${CFLAGS} -o $@ $<
 
 ${FILE}.elf : ${OBJECTS} linker.lcf
-	${CC} ${LINKFLAGS} ${LINKLIBS} ${OBJECTS} -o $@ -lm 
+	${CC} ${LINKFLAGS} ${LINKLIBS} ${OBJECTS} -o $@ ${EXTRA_LDFLAGS} -lm
 
 ${FILE}.obj : ${FILE}.elf
 	${OBJDUMP} ${OBJDUMPFLAGS} $< > $@

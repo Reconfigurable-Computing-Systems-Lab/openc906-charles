@@ -8,15 +8,19 @@ A Git submodule `csi-nn2/` provides a neural network inference library (CSI-NN2)
 
 ## Architecture
 
+### RTL Instantiation Hierarchy
+
+```
+openC906.v          — Processor top (instantiate this for SoC integration)
+ └─ aq_top.v        — System top: wraps core + CLINT + PLIC
+     ├─ aq_core.v   — Core pipeline (~126KB, largest module): IFU → IDU → IU/LSU → RTU
+     ├─ aq_clint.v  — Core Local Interruptor (timer, software interrupts)
+     └─ aq_plic.v   — Platform Level Interrupt Controller
+```
+
 ### Processor Pipeline
 
-The core is in `C906_RTL_FACTORY/gen_rtl/cpu/rtl/` with top-level wrappers:
-
-- `openC906.v` — Processor top (instantiate this for integration)
-- `aq_top.v` — System top including CLINT/PLIC
-- `aq_core.v` — Core pipeline (~126KB, largest module)
-
-Major pipeline stages live in subdirectories of `gen_rtl/`:
+The core is in `C906_RTL_FACTORY/gen_rtl/cpu/rtl/`. Major pipeline stages live in subdirectories of `gen_rtl/`:
 
 | Unit | Directory | Role |
 |------|-----------|------|
@@ -31,17 +35,37 @@ Major pipeline stages live in subdirectories of `gen_rtl/`:
 | DTU/TDT | `dtu/`, `tdt/` | Debug/trace (JTAG) |
 | BIU | `biu/` | AXI/AHB bus interface |
 
+Feature-enable configuration headers (`cpu_cfig.h`, `aq_idu_cfig.h`, `aq_lsu_cfig.h`, `aq_dtu_cfig.h`, `sysmap.h`, `tdt_define.h`) control compile-time options and are referenced in `C906_asic_rtl.fl`.
+
 ### Demo SoC (Simulation)
 
 The SoC wrapper in `smart_run/logical/common/soc.v` connects C906 to:
 
-- **AXI interconnect** (`axi/axi_interconnect128.v`) — 128-bit crossbar
-- **L3 Memory** (`mem/f_spsram_524288x128.v`) — 512K×128-bit SRAM
+- **AXI interconnect** (`axi/axi_interconnect128.v`) — 128-bit crossbar, 4 slave ports (s0–s3)
+- **L3 Memory** — Two-bank 128-bit SRAM via `axi_slave128.v`. Bank select is by address bit; each bank is an `f_spsram_*x128` instance (L = low bank, H = high bank)
 - **UART** (`uart/`) — mapped at `0x10015000`
 - **GPIO** (`gpio/`)
 - **AHB↔APB bridge** (`ahb/ahb2apb.v`)
 
-The testbench (`smart_run/logical/tb/tb.v`) loads `inst.pat` and `data.pat` into L3 memory, runs the core, and detects pass/fail by monitoring a magic value written to a register (`0x444333222` = PASS, `0x2382348720` = FAIL). It also captures UART output to `run_case.report`.
+### Testbench
+
+The testbench (`smart_run/logical/tb/tb.v`) loads `inst.pat` and `data.pat` into L3 SRAM, runs the core, and monitors for completion:
+
+- **Pass/fail detection**: Watches RTU writeback registers (`wb_wb0_data`, `wb_wb1_data`). A test signals PASS by writing `0x444333222` or FAIL by writing `0x2382348720` to any GPR.
+- **Deadlock detection**: Every 50,000 cycles, checks that at least one instruction has retired; otherwise declares FAIL.
+- **Timeout**: `MAX_RUN_TIME` = 700,000,000 cycles. Simulation aborts as FAIL if exceeded.
+- **UART capture**: Monitors AXI writes to `0x10015000` and logs characters to `run_case.report`.
+- **Clock**: 10ns period (100MHz). JTAG clock: 40ns period.
+- **Waveforms**: Controlled by `DUMP=on` make variable. VCS → FSDB (`$fsdbDumpvars`), irun/iverilog → VCD (`$dumpvars`).
+
+Key testbench macros (defined in `tb.v`) for probing signals in the hierarchy:
+
+| Macro | Points to |
+|-------|-----------|
+| `` `SOC_TOP `` | `tb.x_soc` |
+| `` `CPU_TOP `` | `x_cpu_sub_system_axi.x_c906_wrapper.x_cpu_top` |
+| `` `RTL_MEM `` | `x_axi_slave128.x_f_spsram_*_L` (low SRAM bank) |
+| `` `RTL_MEM2 `` | `x_axi_slave128.x_f_spsram_*_H` (high SRAM bank) |
 
 ### Memory Map
 
@@ -51,6 +75,8 @@ The testbench (`smart_run/logical/tb/tb.v`) loads `inst.pat` and `data.pat` into
 | Data | `0x00040000–0x000FFFFF` | Data/BSS (data.pat) |
 | UART | `0x10015000` | UART data register |
 | Stack top | `0x000EE000` | Kernel stack pointer |
+
+> **Note**: An SRAM expansion plan to support 128MB programs is documented in `doc/expand-sram-plan.md`. If implemented, the memory map regions and SRAM module names will change.
 
 ## Build & Simulation Commands
 
@@ -84,6 +110,8 @@ make runcase CASE=ISA_INT SIM=iverilog
 ```
 
 Available test cases: `ISA_THEAD`, `ISA_INT`, `ISA_LS`, `ISA_FP`, `coremark`, `MMU`, `interrupt`, `exception`, `debug`, `csr`, `cache`.
+
+Additional test directories exist under `smart_run/tests/cases/` (`conv_softmax/`, `ISA/ISA_VECTOR/`) but are not in `CASE_LIST` — add them to `smart_cfg.mk` before use.
 
 ### Test Output
 
@@ -119,9 +147,13 @@ Tests are assembly (`.s`) or C files in `smart_run/tests/cases/<category>/`. Eac
 
 - All RTL modules use the `aq_` prefix (e.g., `aq_ifu_top`, `aq_lsu_top`)
 - File lists are in `C906_RTL_FACTORY/gen_rtl/filelists/` (`C906_asic_rtl.fl`, `tdt_dmi_top_rtl.fl`)
-- SoC/testbench file lists are in `smart_run/logical/filelists/` (`sim.fl` → `ip.fl` + `smart.fl` + `tb.fl`)
-- Testbench macros like `` `CPU_TOP ``, `` `RTL_MEM ``, `` `SOC_TOP `` in `tb.v` provide hierarchical paths into the design for probing signals
-- FPGA memory models are in `gen_rtl/fpga/` — used for simulation in place of real SRAM macros
+- SoC/testbench file lists are in `smart_run/logical/filelists/`:
+  - `sim.fl` — top-level, includes `ip.fl` + `smart.fl` + `tb.fl`
+  - `ip.fl` — references `C906_asic_rtl.fl` and `tdt_dmi_top_rtl.fl` from gen_rtl
+  - `smart.fl` — SoC peripherals (AXI, AHB, APB, UART, GPIO, memory, clock)
+  - `tb.fl` — testbench (`tb.v`) and include paths
+- FPGA memory models are in `gen_rtl/fpga/` — behavioral SRAMs used for simulation in place of foundry macros
+- The `debug` test case is special: it includes custom JTAG driver Verilog files (`tests/cases/debug/JTAG_DRV.vh`, `JTAG_DRV.v`) added to the simulator's filelist at compile time
 
 ## Key File Paths
 

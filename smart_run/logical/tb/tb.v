@@ -26,7 +26,7 @@ limitations under the License.
 `timescale 1ns/100ps
 `define CLK_PERIOD          10
 `define TCLK_PERIOD         40
-`define MAX_RUN_TIME        700000000
+`define MAX_RUN_TIME        30000000000
 
 `define SOC_TOP             tb.x_soc
 `define RTL_MEM             tb.x_soc.x_axi_slave128.x_f_spsram_524288x128_L

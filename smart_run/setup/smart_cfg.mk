@@ -27,6 +27,7 @@ CASE_LIST := \
       debug \
       csr \
       cache \
+      conv_softmax \
 
 
 ISA_THEAD_build:
@@ -97,6 +98,17 @@ cache_build:
 	@cp ./tests/cases/cache/* ./work
 	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \; 
 	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd  ENDIAN_MODE=little-endian CASENAME=cache FILE=C906_IDCACHE_OPER >& cache_build.case.log 
+
+
+CSI_NN2_INSTALL := ../../csi-nn2/install_nn2/c906
+conv_softmax_build:
+	@cp ./tests/cases/conv_softmax/bare_main.c ./work
+	@cp ./tests/cases/conv_softmax/model.c ./work
+	@cp ./tests/cases/conv_softmax/sbrk.c ./work
+	@cp ./tests/cases/conv_softmax/test_data.h ./work
+	@cp -r ./tests/cases/conv_softmax/stubs ./work/stubs
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \; 
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=conv_softmax FILE=bare_main EXTRA_CFLAGS="-DSHL_BUILD_RTOS -isystem stubs -I$(CSI_NN2_INSTALL)/include -I$(CSI_NN2_INSTALL)/include/csinn -ffunction-sections -fdata-sections" EXTRA_LDFLAGS="-Wl,--gc-sections -Wl,-z,muldefs $(CSI_NN2_INSTALL)/lib/libshl_c906_rtos.a" >& conv_softmax_build.case.log
 
 
 # Adjust verilog filelist for *.v case...
