@@ -18,9 +18,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-SCRIPT_DIR = Path(__file__).resolve().parent          # hhb/model_split/
-DEFAULT_RESULTS = SCRIPT_DIR / "c906_results.json"
-DEFAULT_OUTPUT = SCRIPT_DIR.parent / "model_compiled"  # hhb/model_compiled/
+SCRIPT_DIR = Path(__file__).resolve().parent          # hhb/
+MODEL_SPLIT_DIR = SCRIPT_DIR / "model_split"
+DEFAULT_RESULTS = MODEL_SPLIT_DIR / "c906_results.json"
+DEFAULT_OUTPUT = SCRIPT_DIR / "model_compiled"         # hhb/model_compiled/
 
 
 def collect(results_path: Path, output_dir: Path, clean: bool = False):
@@ -45,7 +46,7 @@ def collect(results_path: Path, output_dir: Path, clean: bool = False):
 
     for entry in passed:
         model, part, quant = entry["model"], entry["part"], entry["quant"]
-        src_dir = SCRIPT_DIR / model / f"{part}_c906_{quant}"
+        src_dir = MODEL_SPLIT_DIR / model / f"{part}_c906_{quant}"
 
         if not src_dir.exists():
             print(f"  SKIP {model}/{part}_c906_{quant}: source dir missing")

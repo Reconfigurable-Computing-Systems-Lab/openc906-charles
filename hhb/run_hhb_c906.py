@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # Paths
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
-MODEL_SPLIT_DIR = SCRIPT_DIR  # hhb/model_split/
+MODEL_SPLIT_DIR = SCRIPT_DIR / "model_split"
 
 HHB_BIN = "/usr/local/bin/hhb"
 RISCV_GCC = "/opt/Xuantie-900-gcc-linux-6.6.36-glibc-x86_64-V3.3.0/bin/riscv64-unknown-linux-gnu-gcc"
