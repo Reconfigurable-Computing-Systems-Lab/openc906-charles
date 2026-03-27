@@ -52,7 +52,7 @@ def collect(results_path: Path, output_dir: Path, clean: bool = False):
             print(f"  SKIP {model}/{part}_c906_{quant}: source dir missing")
             continue
 
-        dst_dir = output_dir / model / f"{part}_c906_{quant}"
+        dst_dir = output_dir / f"{model}_{part}_c906_{quant}"
         dst_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy model.c, model.params
