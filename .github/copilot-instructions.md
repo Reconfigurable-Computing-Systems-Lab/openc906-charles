@@ -4,7 +4,8 @@
 
 This is the RTL source and simulation environment for the **T-Head C906**, a 64-bit RISC-V processor core supporting RV64GCVXtheadc (Integer, Float, Double, Compressed, Vector, and T-Head custom extensions). The codebase contains synthesizable Verilog RTL, a demo SoC with peripherals, and a self-checking simulation testbench.
 
-A Git submodule `csi-nn2/` provides a neural network inference library (CSI-NN2) for ML workloads on C906.
+- Git submodule `csi-nn2/` provides a neural network inference library (CSI-NN2) for ML workloads on C906.
+- The `hhb/` directory contains HHB (Heterogeneous Honey Badger) toolchain outputs — ONNX model artifacts and scripts for preparing models before generating CSI-NN2 code. See `doc/csi-nn2-bare-metal-guide.md` for the full bare-metal ML inference workflow.
 
 ## Architecture
 
@@ -35,30 +36,42 @@ The core is in `C906_RTL_FACTORY/gen_rtl/cpu/rtl/`. Major pipeline stages live i
 | DTU/TDT | `dtu/`, `tdt/` | Debug/trace (JTAG) |
 | BIU | `biu/` | AXI/AHB bus interface |
 
-Feature-enable configuration headers (`cpu_cfig.h`, `aq_idu_cfig.h`, `aq_lsu_cfig.h`, `aq_dtu_cfig.h`, `sysmap.h`, `tdt_define.h`) control compile-time options and are referenced in `C906_asic_rtl.fl`.
+### Compile-Time Configuration
+
+Feature-enable headers in the filelist `C906_asic_rtl.fl` control major options via `` `define `` macros:
+
+| Header | Key Options |
+|--------|-------------|
+| `cpu_cfig.h` | Cache size (`ICACHE_32K`/`DCACHE_32K`, options: 8K–64K), BHT size (`BHT_16K`), JTLB entries (128), FPU/Vector enable, PA_WIDTH=40, VA_WIDTH=39, PLIC (240 interrupt sources) |
+| `aq_idu_cfig.h` | Instruction decode field definitions and operand widths |
+| `aq_lsu_cfig.h` | LSU data width (128/64-bit), load register config |
+| `aq_dtu_cfig.h` | Debug halt info, trigger config |
+| `sysmap.h` | System memory mapping regions |
+| `tdt_define.h` | JTAG Debug Module definitions |
 
 ### Demo SoC (Simulation)
 
 The SoC wrapper in `smart_run/logical/common/soc.v` connects C906 to:
 
-- **AXI interconnect** (`axi/axi_interconnect128.v`) — 128-bit crossbar, 4 slave ports (s0–s3)
+- **AXI interconnect** (`axi/axi_interconnect128.v`) — 128-bit crossbar, 4 slave ports (s0–s3), 40-bit address
 - **L3 Memory** — Two-bank 128-bit SRAM via `axi_slave128.v`. Bank select is by address bit; each bank is an `f_spsram_*x128` instance (L = low bank, H = high bank)
 - **UART** (`uart/`) — mapped at `0x10015000`
-- **GPIO** (`gpio/`)
+- **GPIO** (`gpio/`) — 8-bit bidirectional Port A
 - **AHB↔APB bridge** (`ahb/ahb2apb.v`)
 
 ### Testbench
 
-The testbench (`smart_run/logical/tb/tb.v`) loads `inst.pat` and `data.pat` into L3 SRAM, runs the core, and monitors for completion:
+The testbench (`smart_run/logical/tb/tb.v`) loads pattern files into L3 SRAM, runs the core, and monitors for completion:
 
-- **Pass/fail detection**: Watches RTU writeback registers (`wb_wb0_data`, `wb_wb1_data`). A test signals PASS by writing `0x444333222` or FAIL by writing `0x2382348720` to any GPR.
+- **Pattern loading**: `$readmemh()` loads `inst.pat`, `data.pat`, and `input.pat` (NN float32 inputs) into temp arrays, then distributes bytes across 16 RAM sub-banks in a byte-swizzled 128-bit row layout.
+- **Pass/fail detection**: Watches RTU writeback registers. A test signals PASS by writing `0x444333222` or FAIL by writing `0x2382348720` to any GPR.
 - **Deadlock detection**: Every 50,000 cycles, checks that at least one instruction has retired; otherwise declares FAIL.
-- **Timeout**: `MAX_RUN_TIME` = 700,000,000 cycles. Simulation aborts as FAIL if exceeded.
+- **Timeout**: `MAX_RUN_TIME` = 30,000,000,000 time units (30s at 1ns timescale).
 - **UART capture**: Monitors AXI writes to `0x10015000` and logs characters to `run_case.report`.
 - **Clock**: 10ns period (100MHz). JTAG clock: 40ns period.
 - **Waveforms**: Controlled by `DUMP=on` make variable. VCS → FSDB (`$fsdbDumpvars`), irun/iverilog → VCD (`$dumpvars`).
 
-Key testbench macros (defined in `tb.v`) for probing signals in the hierarchy:
+Key testbench macros for probing signals in the hierarchy:
 
 | Macro | Points to |
 |-------|-----------|
@@ -71,10 +84,11 @@ Key testbench macros (defined in `tb.v`) for probing signals in the hierarchy:
 
 | Region | Address Range | Content |
 |--------|---------------|---------|
-| Text/Code | `0x00000000–0x0003FFFF` | Instructions (inst.pat) |
-| Data | `0x00040000–0x000FFFFF` | Data/BSS (data.pat) |
+| Text/Code | `0x00000000–0x0003FFFF` | Instructions (`inst.pat`) |
+| Data | `0x00040000–0x0007FFFF` | Data/BSS (`data.pat`) |
+| NN Input | `0x00080000–0x0008FFFF` | Float32 model input (`input.pat`, optional) |
+| Stack top | `0x000EE000` | Kernel stack pointer (grows down) |
 | UART | `0x10015000` | UART data register |
-| Stack top | `0x000EE000` | Kernel stack pointer |
 
 > **Note**: An SRAM expansion plan to support 128MB programs is documented in `doc/expand-sram-plan.md`. If implemented, the memory map regions and SRAM module names will change.
 
@@ -86,7 +100,9 @@ All simulation commands run from `smart_run/`. Environment setup is required fir
 cd C906_RTL_FACTORY && source setup/setup.csh && cd ../smart_run
 ```
 
-The toolchain path must be set in `smart_run/setup/example_setup.csh` (variables `CODE_BASE_PATH` and `TOOL_EXTENSION` pointing to a `riscv64-unknown-elf-gcc` installation).
+Two environment variables must be set in `smart_run/setup/example_setup.csh`:
+- `CODE_BASE_PATH` — absolute path to the `C906_RTL_FACTORY/` directory
+- `TOOL_EXTENSION` — absolute path to the `bin/` directory of a `riscv64-unknown-elf-gcc` installation (e.g., `Xuantie-900-gcc-elf-newlib-x86_64-V3.3.0/bin`)
 
 ### Simulator Selection
 
@@ -99,7 +115,7 @@ make showcase                        # List all available test cases
 make compile [SIM=vcs]               # Compile RTL + testbench only
 make buildcase CASE=ISA_INT          # Compile a single test case to inst.pat/data.pat
 make runcase CASE=ISA_INT [SIM=vcs] [DUMP=on]  # Build + run a single test
-make regress                         # Run full regression (all tests)
+make regress                         # Run full regression (all tests in CASE_LIST)
 make clean                           # Clean work/ directory
 ```
 
@@ -109,14 +125,15 @@ make clean                           # Clean work/ directory
 make runcase CASE=ISA_INT SIM=iverilog
 ```
 
-Available test cases: `ISA_THEAD`, `ISA_INT`, `ISA_LS`, `ISA_FP`, `coremark`, `MMU`, `interrupt`, `exception`, `debug`, `csr`, `cache`.
+Available test cases (defined in `CASE_LIST` in `smart_run/setup/smart_cfg.mk`): `ISA_THEAD`, `ISA_INT`, `ISA_LS`, `ISA_FP`, `coremark`, `MMU`, `interrupt`, `exception`, `debug`, `csr`, `cache`, `conv_softmax`.
 
-Additional test directories exist under `smart_run/tests/cases/` (`conv_softmax/`, `ISA/ISA_VECTOR/`) but are not in `CASE_LIST` — add them to `smart_cfg.mk` before use.
+Additional test directories exist under `smart_run/tests/cases/` (e.g., `ISA/ISA_VECTOR/`) but are not in `CASE_LIST` — add them to `smart_cfg.mk` before use.
 
 ### Test Output
 
 - Simulation log: `smart_run/work/run.{vcs,irun}.log`
 - Test result: `smart_run/work/run_case.report` (contains PASS/FAIL and UART output)
+- Build log: `smart_run/work/<CASE>_build.case.log`
 - Waveforms: `smart_run/work/` (VCD for iverilog/irun, FSDB for VCS)
 - Regression report: `smart_run/tests/regress/regress_report`
 
@@ -126,33 +143,49 @@ Additional test directories exist under `smart_run/tests/cases/` (`conv_softmax/
 
 Tests are assembly (`.s`) or C files in `smart_run/tests/cases/<category>/`. Each test:
 
-1. Gets compiled with `crt0.s` (startup code that initializes GPRs, FPU, vector regs, MMU, CSRs)
-2. Links against `smart_run/tests/lib/linker.lcf`
-3. Produces an ELF → converted to `inst.pat` + `data.pat` (SREC hex patterns)
-4. Signals completion by writing the magic pass/fail value
+1. Gets compiled with `crt0.s` (startup code: enables T-Head extensions, initializes all GPRs/FPU/vector regs, sets up PMP/MMU, jumps to `main`)
+2. Links against `smart_run/tests/lib/linker.lcf` (MEM1: 256KB code at `0x0`, MEM2: 768KB data at `0x40000`)
+3. Produces an ELF → converted via `Srec2vmem` to `inst.pat` + `data.pat` (hex patterns loaded by testbench)
+4. Signals completion by writing the magic pass/fail value to a GPR
+
+A mini C library in `smart_run/tests/lib/clib/` provides `printf()`, UART I/O, interrupt controller setup, and timers.
 
 ### Adding a New Test
 
 1. Create a directory under `smart_run/tests/cases/<category>/`
 2. Add your `.s` or `.c` test file
-3. Add a `<NAME>_build` recipe in `smart_run/setup/smart_cfg.mk` following existing patterns
+3. Add a `<NAME>_build` recipe in `smart_run/setup/smart_cfg.mk` following existing patterns (see any `*_build:` target for the template — copies sources + lib to `work/`, runs make with `CPU_ARCH_FLAG_0` and `CASENAME`)
 4. Add the case name to `CASE_LIST` in `smart_cfg.mk`
 
 ### Toolchain
 
 - Compiler: `riscv64-unknown-elf-gcc` (T-Head extended, supports `-march=rv64imafdcvxtheadc`)
 - Architecture flags are set per-test via `CPU_ARCH_FLAG_0`: `c906` (no FP), `c906fd` (FP), `c906fdv` (FP+Vector)
+- **C906 implements RVV 0.7.1** (not 1.0). GCC 14+ only targets RVV 1.0 — use the reference C backend for CSI-NN2, not the vector-optimized one.
+
+### Known RTL Bug: Indirect Jump Tail Calls
+
+**Indirect `jr` instructions used for tail-call optimization can hang the CPU** when jumping through function pointers in BSS memory. This affects any C code compiled with `-Os` or higher that uses function pointer dispatch (common in CSI-NN2). Always compile with `-fno-optimize-sibling-calls` when linking libraries that use function pointer tables. See `doc/csi-nn2-bare-metal-guide.md` §7 for full analysis.
 
 ## RTL Conventions
 
-- All RTL modules use the `aq_` prefix (e.g., `aq_ifu_top`, `aq_lsu_top`)
-- File lists are in `C906_RTL_FACTORY/gen_rtl/filelists/` (`C906_asic_rtl.fl`, `tdt_dmi_top_rtl.fl`)
-- SoC/testbench file lists are in `smart_run/logical/filelists/`:
-  - `sim.fl` — top-level, includes `ip.fl` + `smart.fl` + `tb.fl`
-  - `ip.fl` — references `C906_asic_rtl.fl` and `tdt_dmi_top_rtl.fl` from gen_rtl
-  - `smart.fl` — SoC peripherals (AXI, AHB, APB, UART, GPIO, memory, clock)
+### Module & Signal Naming
+
+- All core RTL modules use the `aq_` prefix (e.g., `aq_ifu_top`, `aq_lsu_top`). Top-level modules end in `_top`.
+- **Signal naming follows `source_dest_signal`** format: `biu_ifu_arready` = BIU→IFU AXI read-ready; `cp0_ifu_icache_en` = CP0→IFU I-cache enable.
+- External pad signals use `pad_` prefix: `biu_pad_araddr` (core→pad), `pad_biu_rdata` (pad→core).
+- Active-low signals use `_b` suffix (e.g., `pad_cpu_rst_b`).
+- RTL sources contain `// &Depend("file.h")` and `// &ModuleBeg` comments — these are T-Head proprietary tool directives (can be ignored for simulation).
+
+### Filelists
+
+- RTL filelists: `C906_RTL_FACTORY/gen_rtl/filelists/` (`C906_asic_rtl.fl`, `tdt_dmi_top_rtl.fl`)
+- SoC/testbench filelists: `smart_run/logical/filelists/`:
+  - `sim.fl` — top-level for VCS/NC, includes `ip.fl` + `smart.fl` + `tb.fl`
+  - `ip.fl` — references C906 RTL filelists via `${CODE_BASE_PATH}`
+  - `smart.fl` — SoC peripherals (`-y` search directories for AXI, AHB, APB, UART, GPIO, memory, clock)
   - `tb.fl` — testbench (`tb.v`) and include paths
-- FPGA memory models are in `gen_rtl/fpga/` — behavioral SRAMs used for simulation in place of foundry macros
+- FPGA memory models are in `gen_rtl/fpga/` — behavioral SRAMs (8 variants from 64×58 to 2048×32, plus a generic configurable `fpga_ram.v`) used for simulation in place of foundry macros
 - The `debug` test case is special: it includes custom JTAG driver Verilog files (`tests/cases/debug/JTAG_DRV.vh`, `JTAG_DRV.v`) added to the simulator's filelist at compile time
 
 ## Key File Paths
@@ -160,6 +193,7 @@ Tests are assembly (`.s`) or C files in `smart_run/tests/cases/<category>/`. Eac
 | What | Path |
 |------|------|
 | Processor RTL top | `C906_RTL_FACTORY/gen_rtl/cpu/rtl/openC906.v` |
+| CPU configuration | `C906_RTL_FACTORY/gen_rtl/cpu/rtl/cpu_cfig.h` |
 | SoC wrapper | `smart_run/logical/common/soc.v` |
 | Testbench | `smart_run/logical/tb/tb.v` |
 | Simulation Makefile | `smart_run/Makefile` |
@@ -167,3 +201,6 @@ Tests are assembly (`.s`) or C files in `smart_run/tests/cases/<category>/`. Eac
 | Boot/startup code | `smart_run/tests/lib/crt0.s` |
 | Linker script | `smart_run/tests/lib/linker.lcf` |
 | Test library (UART, printf) | `smart_run/tests/lib/clib/` |
+| SRAM expansion plan | `doc/expand-sram-plan.md` |
+| Bare-metal ML guide | `doc/csi-nn2-bare-metal-guide.md` |
+| Testbench signal reference | `doc/tb-reference.md` |
