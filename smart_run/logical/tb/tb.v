@@ -23,9 +23,9 @@ limitations under the License.
 
 
 
-`timescale 1ns/100ps
-`define CLK_PERIOD          10
-`define TCLK_PERIOD         40
+`timescale 1ns/100fs
+`define CLK_PERIOD          1
+`define TCLK_PERIOD         4
 `define MAX_RUN_TIME        30000000000
 
 `define SOC_TOP             tb.x_soc
@@ -99,6 +99,7 @@ end
 integer i;
   bit [31:0] mem_inst_temp [65536];
   bit [31:0] mem_data_temp [65536];
+  bit [31:0] mem_input_temp[16384];
   integer j;
   initial
   begin
@@ -127,6 +128,7 @@ integer i;
     $display("\t********* Read program *********");
     $readmemh("inst.pat", mem_inst_temp);
     $readmemh("data.pat", mem_data_temp);
+    $readmemh("input.pat", mem_input_temp);
   
     $display("\t********* Load program to memory *********");
     i=0;
@@ -176,6 +178,28 @@ integer i;
       `RTL_MEM.ram14.mem[i+32'h4000][7:0]  = mem_data_temp[j][15: 8];
       `RTL_MEM.ram15.mem[i+32'h4000][7:0]  = mem_data_temp[j][ 7: 0];
       j = j+1;
+    end
+    // Load input.pat (float32 NN input) at address 0x00080000 (row offset 0x8000)
+    i=0;
+    for(j=0;j<32'd12544;j=j+4)
+    begin
+      i = j / 4;
+      `RTL_MEM.ram0.mem[i+32'h8000][7:0]  = mem_input_temp[j][31:24];
+      `RTL_MEM.ram1.mem[i+32'h8000][7:0]  = mem_input_temp[j][23:16];
+      `RTL_MEM.ram2.mem[i+32'h8000][7:0]  = mem_input_temp[j][15: 8];
+      `RTL_MEM.ram3.mem[i+32'h8000][7:0]  = mem_input_temp[j][ 7: 0];
+      `RTL_MEM.ram4.mem[i+32'h8000][7:0]  = mem_input_temp[j+1][31:24];
+      `RTL_MEM.ram5.mem[i+32'h8000][7:0]  = mem_input_temp[j+1][23:16];
+      `RTL_MEM.ram6.mem[i+32'h8000][7:0]  = mem_input_temp[j+1][15: 8];
+      `RTL_MEM.ram7.mem[i+32'h8000][7:0]  = mem_input_temp[j+1][ 7: 0];
+      `RTL_MEM.ram8.mem[i+32'h8000][7:0]  = mem_input_temp[j+2][31:24];
+      `RTL_MEM.ram9.mem[i+32'h8000][7:0]  = mem_input_temp[j+2][23:16];
+      `RTL_MEM.ram10.mem[i+32'h8000][7:0] = mem_input_temp[j+2][15: 8];
+      `RTL_MEM.ram11.mem[i+32'h8000][7:0] = mem_input_temp[j+2][ 7: 0];
+      `RTL_MEM.ram12.mem[i+32'h8000][7:0] = mem_input_temp[j+3][31:24];
+      `RTL_MEM.ram13.mem[i+32'h8000][7:0] = mem_input_temp[j+3][23:16];
+      `RTL_MEM.ram14.mem[i+32'h8000][7:0] = mem_input_temp[j+3][15: 8];
+      `RTL_MEM.ram15.mem[i+32'h8000][7:0] = mem_input_temp[j+3][ 7: 0];
     end
   end
 

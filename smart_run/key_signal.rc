@@ -1,0 +1,548 @@
+Magic 271485
+Revision Verdi_X-2025.06
+
+; Window Layout <x> <y> <width> <height> <signalwidth> <valuewidth>
+viewPort 0 11 3840 849 495 65
+
+; File list:
+; openDirFile [-d delimiter] [-s time_offset] [-rf auto_bus_rule_file] path_name file_name
+openDirFile -d / "" "/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/work/novas.fsdb"
+
+; file time scale:
+; fileTimeScale ### s|ms|us|ns|ps
+
+; signal spacing:
+signalSpacing 5
+
+; windowTimeUnit is used for zoom, cursor & marker
+windowTimeUnit 1ns
+
+; waveform viewport range
+zoom 5355476.560295 5356023.526395 1n
+cursor 5355575.000000
+marker 5355585.000000
+
+; user define markers
+; userMarker time_pos marker_name color linestyle
+; visible top row signal index
+top 37
+; marker line index
+markerPos 8
+
+; event list
+; addEvent event_name event_expression
+; curEvent event_name
+
+
+
+COMPLEX_EVENT_BEGIN
+
+
+COMPLEX_EVENT_END
+
+
+
+; toolbar current search type
+; curSTATUS search_type
+curSTATUS ByChange
+
+
+aliasmapname axi_slave128.cur_state
+nalias IDLE		2'b00		NULL
+nalias WRITE		2'b01		NULL
+nalias WRITE_RESP		2'b10		NULL
+nalias READ		2'b11		NULL
+
+aliasmapname aq_lsu_vb.vb_cur_state
+nalias VB_IDLE		4'b0000		NULL
+nalias VB_ALIAS_WFC		4'b0100		NULL
+nalias VB_BUS_REQ		4'b0001		NULL
+nalias VB_DATA_2		4'b1010		NULL
+nalias VB_DATA_3		4'b1011		NULL
+nalias VB_BUS_WFC		4'b0010		NULL
+nalias VB_DATA_0		4'b1000		NULL
+nalias VB_ALIAS_REQ		4'b0011		NULL
+nalias VB_DATA_1		4'b1001		NULL
+
+aliasmapname aq_lsu_stb.merge_cur_state
+nalias MERGE_SECND		3'b010		NULL
+nalias MERGE_ABORT		3'b011		NULL
+nalias MERGE_IDLE		3'b000		NULL
+nalias MERGE_WFC		3'b100		NULL
+nalias MERGE_FIRST		3'b001		NULL
+
+aliasmapname aq_lsu_stb.burst_cur_state
+nalias BURST_WFR0		4'b0000		NULL
+nalias BURST_WFR1		4'b0001		NULL
+nalias BURST_DATA0		4'b0100		NULL
+nalias BURST_EMPTY2		4'b1010		NULL
+nalias BURST_DATA1		4'b0101		NULL
+nalias BURST_EMPTY3		4'b1011		NULL
+nalias BURST_WFR2		4'b0010		NULL
+nalias BURST_WFR3		4'b0011		NULL
+nalias BURST_DATA2		4'b0110		NULL
+nalias BURST_EMPTY1		4'b1001		NULL
+nalias BURST_DATA3		4'b0111		NULL
+
+aliasmapname axi_err128.cur_state
+nalias IDLE		2'b00		NULL
+nalias WRITE		2'b01		NULL
+nalias WRITE_RESP		2'b10		NULL
+nalias READ		2'b11		NULL
+
+aliasmapname axi2ahb.cur_st
+nalias WT_DB_WR		9'b100000000		NULL
+nalias RD_LAST_DATA		9'b001000000		NULL
+nalias RESP_AXI		9'b000010000		NULL
+nalias WR_AHB		9'b000000100		NULL
+nalias FSM_IDLE		9'b000000001		NULL
+nalias WR_AXI		9'b010000000		NULL
+nalias WR_LAST_DATA		9'b000001000		NULL
+nalias RD_AHB		9'b000100000		NULL
+nalias RD_AXI		9'b000000010		NULL
+
+aliasmapname aq_lsu_dc.dc_cur_state
+nalias IDLE		2'b00		NULL
+nalias DCS		2'b01		NULL
+nalias FRZ		2'b10		NULL
+nalias REPLY		2'b11		NULL
+
+aliasmapname uart_receive.cur_state
+nalias CLECT_SIG		6'b100000		NULL
+nalias PARITY		6'b001000		NULL
+nalias START		6'b000010		NULL
+nalias STOP		6'b010000		NULL
+nalias DATA		6'b000100		NULL
+nalias IDLE		6'b000001		NULL
+
+aliasmapname uart_trans.cur_state
+nalias PARITY		5'b01000		NULL
+nalias START		5'b00010		NULL
+nalias STOP		5'b10000		NULL
+nalias DATA		5'b00100		NULL
+nalias IDLE		5'b00001		NULL
+
+aliasmapname apb_bridge.cur_state
+nalias W_SELECT		3'b010		NULL
+nalias R_SELECT		3'b011		NULL
+nalias IDLE		3'b000		NULL
+nalias ENABLE		3'b100		NULL
+nalias LATCH		3'b001		NULL
+
+aliasmapname aq_lsu_lfb_entry.lfb_cur_state
+nalias LFB_RDL		3'b010		NULL
+nalias LFB_REF_3		3'b110		NULL
+nalias LFB_RBUS		3'b011		NULL
+nalias LFB_REF_4		3'b111		NULL
+nalias LFB_IDLE		3'b000		NULL
+nalias LFB_REF_1		3'b100		NULL
+nalias LFB_WRDL		3'b001		NULL
+nalias LFB_REF_2		3'b101		NULL
+
+aliasmapname aq_biu_apbif.apb_cur_state
+nalias IDLE		2'b00		NULL
+nalias WDATA		2'b01		NULL
+nalias REQ		2'b10		NULL
+nalias PEND		2'b11		NULL
+
+aliasmapname aq_cp0_fence_inst.fence_cur_state
+nalias FNC_CDCA		3'b010		NULL
+nalias FNC_CMMU		3'b011		NULL
+nalias FNC_IDLE		3'b000		NULL
+nalias FNC_FENC		3'b001		NULL
+nalias FNC_IICA		3'b100		NULL
+nalias FNC_CMPLT		3'b101		NULL
+
+aliasmapname aq_cp0_lpmd.cur_state
+nalias IDLE		2'b00		NULL
+nalias WAIT		2'b01		NULL
+nalias LPMD		2'b10		NULL
+
+aliasmapname aq_idu_id_split.lsd_cur_state
+nalias LSD_IDLE		1'b0		NULL
+nalias LSD_SPLIT		1'b1		NULL
+
+aliasmapname aq_idu_id_split.amo_cur_state
+nalias AMO_AQ		3'b110		NULL
+nalias AMO_IDLE		3'b000		NULL
+nalias AMO_AMO		3'b001		NULL
+nalias AMO_LR		3'b100		NULL
+nalias AMO_SC		3'b101		NULL
+
+aliasmapname aq_idu_id_split.che_cur_state
+nalias CHE_IDLE		1'b0		NULL
+nalias CHE_SPLIT		1'b1		NULL
+
+aliasmapname aq_idu_id_split.fnc_cur_state
+nalias FNC_IDLE		1'b0		NULL
+nalias FNC_SPLIT		1'b1		NULL
+
+aliasmapname aq_cp0_rst_ctrl.rst_cache_inv
+nalias RST_IDLE		2'b00		NULL
+nalias RST_WFC		2'b01		NULL
+
+aliasmapname aq_cp0_rst_ctrl.icache_cur_state
+nalias RST_IDLE		2'b00		NULL
+nalias RST_WFC		2'b01		NULL
+nalias RST_DONE		2'b10		NULL
+
+aliasmapname aq_cp0_rst_ctrl.bht_cur_state
+nalias RST_IDLE		2'b00		NULL
+nalias RST_WFC		2'b01		NULL
+nalias RST_DONE		2'b10		NULL
+
+aliasmapname aq_cp0_rst_ctrl.dcache_cur_state
+nalias RST_IDLE		2'b00		NULL
+nalias RST_WFC		2'b01		NULL
+nalias RST_DONE		2'b10		NULL
+
+aliasmapname aq_cp0_rst_ctrl.mmu_cur_state
+nalias RST_IDLE		2'b00		NULL
+nalias RST_WFC		2'b01		NULL
+nalias RST_DONE		2'b10		NULL
+
+aliasmapname aq_lsu_rdl.rdl_cur_state
+nalias RDL_IDLE		4'b0000		NULL
+nalias RDL_TAG_UPDT		4'b0100		NULL
+nalias RDL_DIRTY_RD		4'b0001		NULL
+nalias RDL_DATA_RD_2		4'b1010		NULL
+nalias RDL_CHECK		4'b0101		NULL
+nalias RDL_DATA_RD_3		4'b1011		NULL
+nalias RDL_DATA_RD_0		4'b1000		NULL
+nalias RDL_DIRTY_UPDT		4'b0010		NULL
+nalias RDL_DATA_RD_1		4'b1001		NULL
+nalias RDL_INV		4'b0110		NULL
+nalias RDL_WVB		4'b1100		NULL
+nalias RDL_TAG_RD		4'b0011		NULL
+nalias RDL_ACHECK		4'b0111		NULL
+nalias RDL_LAST		4'b1101		NULL
+
+aliasmapname aq_lsu_stb_entry.stb_cur_state
+nalias STB_IDLE		4'b0000		NULL
+nalias STB_WBUS		4'b0100		NULL
+nalias STB_WLFB		4'b0001		NULL
+nalias STB_FWD		4'b1000		NULL
+nalias STB_WCA		4'b0010		NULL
+nalias STB_MERGE		4'b0011		NULL
+nalias STB_RDL		4'b0110		NULL
+nalias STB_WRDL		4'b0111		NULL
+
+aliasmapname aq_lsu_lm.lm_cur_state
+nalias LM_OPEN		1'b0		NULL
+nalias LM_EXCL		1'b1		NULL
+
+aliasmapname aq_lsu_mcic.ptw_cur_state
+nalias PTW_IDLE		2'b00		NULL
+nalias PTW_REQ_DCACHE		2'b01		NULL
+nalias PTW_WAIT_DATA		2'b10		NULL
+
+aliasmapname aq_lsu_ag.unalign_cur_state
+nalias UNALIGN_IDLE		1'b0		NULL
+nalias UNALIGN_SECD		1'b1		NULL
+
+aliasmapname aq_lsu_dtif.dt_cur_state
+nalias DATA_CHK		3'b010		NULL
+nalias WAIT_DATA		3'b011		NULL
+nalias IDLE		3'b000		NULL
+nalias WAIT_PIPE		3'b100		NULL
+nalias ADDR_CHK		3'b001		NULL
+nalias WAIT_CMPLT		3'b101		NULL
+
+aliasmapname aq_vlsu_lsu_if.sseg_cur_state
+nalias SSEG_IDLE		4'b0000		NULL
+nalias SSEG_WB		4'b1010		NULL
+nalias SSEG_WAIT		4'b1110		NULL
+nalias SSEG_EXPT		4'b1111		NULL
+nalias SSEG_EXPT_IDLE		4'b1000		NULL
+nalias SSEG_MERGE		4'b1001		NULL
+nalias SSEG_FWD_DATA_PRE		4'b1100		NULL
+nalias SSEG_FWD		4'b1101		NULL
+
+aliasmapname aq_lsu_pfb.pfb_cur_state
+nalias PF_IDLE		4'b0000		NULL
+nalias PF_SUSP		4'b1010		NULL
+nalias PF_CHKS		4'b0101		NULL
+nalias PF_EVICT		4'b1011		NULL
+nalias PF_INIT		4'b1000		NULL
+nalias PF_REQ		4'b1001		NULL
+nalias PF_CALS		4'b0011		NULL
+
+aliasmapname aq_lsu_amr.amr_cur_state
+nalias AMR_CHCK		3'b110		NULL
+nalias AMR_FUNC		3'b111		NULL
+nalias AMR_IDLE		3'b000		NULL
+nalias AMR_MISS_WAIT		3'b001		NULL
+nalias AMR_CALS		3'b101		NULL
+
+aliasmapname aq_mmu_ptw.ptw_cur_st
+nalias PTW_THD_DATA		5'b01000		NULL
+nalias PTW_FST_DATA		5'b00010		NULL
+nalias PTW_DATA_VLD		5'b01100		NULL
+nalias PTW_THD_CHK		5'b01001		NULL
+nalias PTW_2M_PMP1		5'b10010		NULL
+nalias PTW_SCD_CHK		5'b00110		NULL
+nalias PTW_FST_CHK		5'b00011		NULL
+nalias PTW_2M_PMP2		5'b10011		NULL
+nalias PTW_ABT_DATA		5'b01101		NULL
+nalias PTW_THD_PMP		5'b00111		NULL
+nalias PTW_IDLE		5'b00000		NULL
+nalias PTW_SCD_PMP		5'b00100		NULL
+nalias PTW_1G_PMP1		5'b10000		NULL
+nalias PTW_FST_PMP		5'b00001		NULL
+nalias PTW_1G_PMP2		5'b10001		NULL
+nalias PTW_SCD_DATA		5'b00101		NULL
+nalias PTW_ACC_FLT		5'b01010		NULL
+nalias PTW_ABT		5'b01110		NULL
+nalias PTW_PGE_FLT		5'b01011		NULL
+nalias PTW_MACH_PMP		5'b01111		NULL
+
+aliasmapname aq_vidu_vid_split_fp.non_cur_state
+nalias NON_IDLE		1'b0		NULL
+nalias NON_SPLIT		1'b1		NULL
+
+aliasmapname aq_fdsu_scalar_ctrl.fdsu_cur_state
+nalias ITER		3'b010		NULL
+nalias RND		3'b011		NULL
+nalias ID0		3'b110		NULL
+nalias ID1		3'b111		NULL
+nalias IDLE		3'b000		NULL
+nalias PACK		3'b100		NULL
+nalias WFI2		3'b001		NULL
+nalias WFWB		3'b101		NULL
+
+aliasmapname aq_ifu_vec.vec_cur_state
+nalias IDLE		2'b00		NULL
+nalias RESET		2'b01		NULL
+nalias HALT		2'b10		NULL
+nalias WARM_UP		2'b11		NULL
+
+aliasmapname aq_ifu_icache.ref_cur_st
+nalias INIT		3'b010		NULL
+nalias WFC		3'b011		NULL
+nalias IDLE		3'b000		NULL
+nalias WFPA		3'b100		NULL
+nalias REQ		3'b001		NULL
+
+aliasmapname aq_ifu_icache.pf_cur_st
+nalias PF_CHK		3'b010		NULL
+nalias PF_WFC2		3'b110		NULL
+nalias PF_REQ		3'b011		NULL
+nalias PF_WFC3		3'b111		NULL
+nalias IDLE		3'b000		NULL
+nalias PF_WFC0		3'b100		NULL
+nalias PF_READ		3'b001		NULL
+nalias PF_WFC1		3'b101		NULL
+
+aliasmapname aq_ifu_icache.iop_cur_st
+nalias IOP_IDLE		2'b00		NULL
+nalias IOP_READ		2'b01		NULL
+nalias IOP_WRTE		2'b10		NULL
+nalias IOP_FLOP		2'b11		NULL
+
+aliasmapname aq_ifu_pred.ras_cur_st
+nalias RAS_IDLE		1'b0		NULL
+nalias RAS_WAIT		1'b1		NULL
+
+aliasmapname aq_ifu_bht.bht_inv_cur_st
+nalias BHT_INV_IDLE		2'b00		NULL
+nalias BHT_INV_WRTE		2'b10		NULL
+nalias BHT_INV_READ		2'b11		NULL
+
+aliasmapname aq_ifu_bht.bht_ref_cur_st
+nalias BHT_REF_READ2		3'b010		NULL
+nalias BHT_REF_WRTE		3'b110		NULL
+nalias BHT_REF_UPD		3'b111		NULL
+nalias BHT_REF_IDLE		3'b000		NULL
+nalias BHT_REF_READ1		3'b001		NULL
+
+aliasmapname aq_iu_div.div_cur_state
+nalias ALIGN		3'b010		NULL
+nalias ITER		3'b011		NULL
+nalias IDLE		3'b000		NULL
+nalias CMPLT		3'b100		NULL
+nalias WFI2		3'b001		NULL
+nalias WFWB		3'b101		NULL
+
+aliasmapname aq_iu_mul.mul_cur_state
+nalias IDLE		2'b00		NULL
+nalias SPLIT0		2'b01		NULL
+nalias SPLIT1		2'b10		NULL
+nalias CMPLT		2'b11		NULL
+
+aliasmapname aq_rtu_retire.flush_cur_state
+nalias FLUSH_BE		3'b010		NULL
+nalias FLUSH_FE_BE		3'b011		NULL
+nalias FLUSH_IDLE		3'b000		NULL
+nalias FLUSH_WAIT		3'b100		NULL
+nalias FLUSH_FE		3'b001		NULL
+
+aliasmapname aq_mmu_arb.arb_cur_st
+nalias ARB_IDLE		2'b00		NULL
+nalias ARB_IUTLB		2'b01		NULL
+nalias ARB_DUTLB		2'b10		NULL
+
+aliasmapname aq_mmu_arb.read_cur_st
+nalias READ_IDLE		2'b00		NULL
+nalias READ_4K		2'b01		NULL
+nalias READ_1G		2'b10		NULL
+nalias READ_2M		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbp_cur_st
+nalias PIDLE		2'b00		NULL
+nalias PWFG		2'b01		NULL
+nalias PWFC		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbr_cur_st
+nalias RIDLE		2'b00		NULL
+nalias RWFG		2'b01		NULL
+nalias RWFC		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbwi_cur_st
+nalias WIIDLE		2'b00		NULL
+nalias WIWFG		2'b01		NULL
+nalias WIWFC		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbwr_cur_st
+nalias WRIDLE		2'b00		NULL
+nalias WRTAG		2'b01		NULL
+nalias WRWFG		2'b10		NULL
+nalias WRWFC		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbiasid_cur_st
+nalias IASID_WFC		3'b010		NULL
+nalias IASID_WT		3'b011		NULL
+nalias IASID_IDLE		3'b000		NULL
+nalias IASID_NWT		3'b100		NULL
+nalias IASID_RD		3'b001		NULL
+nalias IASID_FIN		3'b101		NULL
+
+aliasmapname aq_mmu_tlboper.tlbiall_cur_st
+nalias IALL_IDLE		2'b00		NULL
+nalias IALL_WFC		2'b01		NULL
+nalias IALL_FIN		2'b11		NULL
+
+aliasmapname aq_mmu_tlboper.tlbiva_cur_st
+nalias IVA_IDLE		4'b0000		NULL
+nalias IVA_4K_WR		4'b0100		NULL
+nalias IVA_1G_RD		4'b1010		NULL
+nalias IVA_4K_WT		4'b0101		NULL
+nalias IVA_CMPLT		4'b1110		NULL
+nalias IVA_1G_CMP		4'b1011		NULL
+nalias IVA_2M_WR		4'b1000		NULL
+nalias IVA_4K_RD		4'b0010		NULL
+nalias IVA_1G_WR		4'b1100		NULL
+nalias IVA_2M_WT		4'b1001		NULL
+nalias IVA_2M_RD		4'b0110		NULL
+nalias IVA_4K_CMP		4'b0011		NULL
+nalias IVA_1G_WT		4'b1101		NULL
+nalias IVA_2M_CMP		4'b0111		NULL
+
+aliasmapname aq_mmu_utlb.ref_cur_st
+nalias IDLE		2'b00		NULL
+nalias WFG		2'b01		NULL
+nalias WFC		2'b10		NULL
+nalias ABT		2'b11		NULL
+
+aliasmapname aq_dtu_cdc.cur_state
+nalias IDLE		2'b00		NULL
+nalias PULSE		2'b01		NULL
+nalias HAVE_RESET		2'b10		NULL
+nalias PENDING		2'b11		NULL
+
+aliasmapname plic_arb_ctrl.arb_state
+nalias IDLE		2'b00		NULL
+nalias ARBTRATE		2'b01		NULL
+nalias ARB_DELAY		2'b10		NULL
+nalias WRITE_CLAIM		2'b11		NULL
+
+aliasmapname tdt_dm.regacc_cur_state
+nalias REGACC_IDLE		4'b0000		NULL
+nalias REGACC_DSC1_2_X6		4'b0100		NULL
+nalias REGACC_WDSC0		4'b0001		NULL
+nalias REGACC_DSC0_2_X6		4'b1010		NULL
+nalias REGACC_DSC0_2_G		4'b0101		NULL
+nalias REGACC_X6_2_C		4'b1000		NULL
+nalias REGACC_RDSC0		4'b0010		NULL
+nalias REGACC_X6_2_DSC0		4'b1001		NULL
+nalias REGACC_X6_2_DSC1		4'b0011		NULL
+nalias REGACC_G_2_DSC0		4'b0110		NULL
+nalias REGACC_C_2_X6		4'b0111		NULL
+
+addGroup "CPU Clock"
+activeDirFile "" "/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/work/novas.fsdb"
+addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/forever_cpuclk
+addGroup "L3 SRAM (axi_slave128)"
+aliasname axi_slave128.cur_state
+addSignal -c ID_ORANGE5 -ls solid -lw 1 -h 16 -UNSIGNED -HEX /tb/x_soc/x_axi_slave128/cur_state[1:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope mem_addr[22:4]
+addSignal -h 16 -holdScope mem_cen_0
+addSignal -h 16 -UNSIGNED -HEX -holdScope mem_wen[15:0]
+addSignal -c ID_ORANGE5 -ls solid -lw 1 -h 16 -UNSIGNED -HEX -holdScope mem_din[127:0]
+addSignal -c ID_ORANGE5 -ls solid -lw 1 -h 16 -UNSIGNED -HEX -holdScope mem_dout[127:0]
+addGroup "Instruction Issue & Retire"
+addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/ifu_idu_id_inst_vld
+addSignal -h 16 -UNSIGNED -HEX -holdScope ifu_idu_id_inst[31:0]
+addSignal -h 16 -holdScope idu_iu_ex1_inst_vld
+addSignal -h 16 -holdScope idu_iu_ex1_pipedown_vld
+addSignal -h 16 -holdScope rtu_pad_retire
+addSignal -h 16 -UNSIGNED -HEX -holdScope rtu_pad_retire_pc[39:0]
+addSignal -h 16 -holdScope rtu_hpcp_retire_inst_vld
+addSignal -h 16 -UNSIGNED -HEX -holdScope rtu_hpcp_retire_pc[39:0]
+addSignal -h 16 -holdScope rtu_dtu_retire_vld
+addSignal -h 16 -holdScope rtu_idu_commit
+addGroup "CP0 Running State"
+addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/x_aq_cp0_top/cp0_rtu_in_lpmd
+addSignal -h 16 -holdScope cp0_ifu_in_lpmd
+addSignal -h 16 -holdScope cp0_yy_clk_en
+addSignal -h 16 -UNSIGNED -HEX -holdScope cp0_yy_priv_mode[1:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope cp0_biu_lpmd_b[1:0]
+addSignal -h 16 -holdScope cp0_ifu_lpmd_req
+addSignal -h 16 -holdScope cp0_mmu_lpmd_req
+addGroup "Pipeline Stall & Busy"
+addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/ifu_idu_id_inst_vld
+addSignal -h 16 -holdScope ifu_mmu_va_vld
+addSignal -h 16 -holdScope idu_ifu_id_stall
+addSignal -h 16 -holdScope idu_hpcp_backend_stall
+addSignal -h 16 -holdScope idu_hpcp_frontend_stall
+addSignal -h 16 -holdScope iu_idu_bju_full
+addSignal -h 16 -holdScope iu_idu_bju_global_full
+addSignal -h 16 -holdScope iu_idu_div_full
+addSignal -h 16 -holdScope iu_idu_mult_full
+addSignal -h 16 -holdScope iu_idu_mult_issue_stall
+addSignal -h 16 -holdScope lsu_idu_full
+addSignal -h 16 -holdScope lsu_idu_global_full
+addSignal -h 16 -holdScope lsu_rtu_ex1_wb_vld
+addSignal -h 16 -holdScope lsu_rtu_ex2_data_vld
+addSignal -h 16 -holdScope lsu_vlsu_dc_stall
+addSignal -h 16 -holdScope rtu_cpu_no_retire
+addSignal -h 16 -holdScope rtu_idu_flush_stall
+addSignal -h 16 -holdScope rtu_yy_xx_expt_vld
+addSignal -h 16 -holdScope mmu_ifu_pa_vld
+addSignal -h 16 -holdScope mmu_lsu_pa_vld
+addSignal -h 16 -holdScope vidu_vpu_vid_fp_inst_vld
+addSignal -h 16 -holdScope vidu_vpu_vid_fp_inst_dp_vld
+addSignal -h 16 -holdScope vpu_vidu_vex1_fp_stall
+addGroup "Dispatch Unit Select"
+addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/idu_iu_ex1_alu_sel
+addSignal -h 16 -holdScope idu_iu_ex1_bju_sel
+addSignal -h 16 -holdScope idu_iu_ex1_mult_sel
+addSignal -h 16 -holdScope idu_iu_ex1_div_sel
+addSignal -h 16 -holdScope idu_lsu_ex1_sel
+addSignal -h 16 -holdScope idu_vidu_ex1_fp_sel
+addSignal -h 16 -holdScope idu_vidu_ex1_vec_sel
+addSignal -h 16 -UNSIGNED -HEX -holdScope idu_iu_ex1_func[19:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope idu_lsu_ex1_func[19:0]
+addGroup "ALU Mode / Data Type"
+addSignal -h 16 -UNSIGNED -HEX /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/x_aq_cp0_top/cp0_idu_vsew[1:0]
+addSignal -h 16 -UNSIGNED -HEX /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/x_aq_top_0/x_aq_core/idu_lsu_ex1_vsew[1:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope vidu_vpu_vid_fp_inst_eu[9:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope vidu_vpu_vid_fp_inst_func[19:0]
+addSignal -h 16 -holdScope vidu_vpu_vid_fp_inst_vld
+addSignal -h 16 -UNSIGNED -HEX -holdScope lsu_vlsu_dc_sew[1:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope lsu_vlsu_sew[1:0]
+addSignal -h 16 -UNSIGNED -HEX -holdScope lsu_vlsu_st_sew[1:0]
+addGroup "G8"
+
+; getSignalForm Scope Hierarchy Status
+; active file of getSignalForm
+

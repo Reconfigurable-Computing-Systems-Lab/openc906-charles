@@ -151,7 +151,12 @@ graph first, then executes it during inference.
 int main(void) {
     install_trap_handler();           // Override crt0.s broken vector table
     void *sess = csinn_((char *)model_params);  // Build graph
-    // ... set up input tensor with dummy data ...
+
+    // Read real float32 input from 0x00080000 (loaded by tb.v from input.pat)
+    volatile float *input_f32 = (volatile float *)0x00080000;
+    // Quantize float32 → int8 using model's qinfo (scale + zero_point)
+    shl_ref_f32_to_input_dtype(input_tensor, input_f32, sess);
+
     csinn_update_input_and_run(inputs, sess);    // Run inference
     // ... cleanup ...
     return 0;
@@ -164,15 +169,38 @@ because the default `crt0.s` exception vector table uses `.long` (4-byte)
 entries but the handler loads them with `ld` (8-byte), causing an infinite
 exception loop on any trap.
 
-### 4.3 `test_data.h` — Embedded Weights and Input
+**Real input data loading:** The testbench (`tb.v`) loads `input.pat` into
+RTL memory at address `0x00080000`.  The main function reads these float32
+values and uses `shl_ref_f32_to_input_dtype()` to quantize them to the
+model's int8 format using the session's quantization parameters (zero_point
+and scale from `model.params`).
+
+### 4.3 `test_data.h` — Embedded Weights
 
 ```c
 static const unsigned char model_params[496] = { ... };  // Quantization params + weights
-static const signed char input_data[12544] = {0};        // Dummy zeros: [1,16,28,28]
 ```
 
-Weights are embedded as a C array (extracted from the HHB model binary).
-Input data is all zeros — sufficient to verify the computation completes.
+Weights are embedded as a C array (extracted from `model.params`).
+
+### 4.4 `input.pat` — Real Input Data
+
+The file `input.0.bin` (50,176 bytes = 12,544 float32 values, shape
+`[1, 16, 28, 28]`) is converted to a Verilog hex pattern file `input.pat`.
+Each line contains one 32-bit word in hexadecimal.  The testbench loads this
+file into RTL SRAM at address `0x00080000` so the firmware can access the
+real float32 input values directly from memory.
+
+**Conversion (Python):**
+```python
+import struct
+with open("input.0.bin", "rb") as f:
+    data = f.read()
+with open("input.pat", "w") as f:
+    for i in range(0, len(data), 4):
+        word = struct.unpack("<I", data[i:i+4])[0]
+        f.write(f"{word:08x}\n")
+```
 
 ### 4.4 `sbrk.c` — Heap and Stubs
 
@@ -238,8 +266,36 @@ Key flags:
 
 ### 5.3 `smart_run/logical/tb/tb.v`
 
-Increased `MAX_RUN_TIME` from 700ms to 30s to allow enough simulated time for
-inference.
+Two changes:
+
+1. Increased `MAX_RUN_TIME` from 700ms to 30s to allow enough simulated time
+   for inference.
+
+2. **Added `input.pat` loading**: A new `$readmemh("input.pat", ...)` call
+   loads the float32 input data into RTL SRAM at byte address `0x00080000`
+   (row offset `0x8000` in the 128-bit memory).  The loading loop distributes
+   32-bit words across the 16 memory banks following the same byte-swizzle
+   pattern as `inst.pat` and `data.pat`:
+
+   ```verilog
+   reg [31:0] mem_input_temp[0:16383];
+   initial $readmemh("input.pat", mem_input_temp);
+
+   // Distribute to RAM banks at row offset 0x8000
+   for (i = 0; i < 16384; i = i + 4) begin
+       `RTL_MEM.ram0.mem_array [i/4 + 32'h8000] = ...;
+       // ... (16 banks × byte swizzle)
+   end
+   ```
+
+### 5.4 Memory Map
+
+| Region | Address Range | Loaded From |
+|--------|---------------|-------------|
+| Text/Code | `0x00000000–0x0003FFFF` | `inst.pat` |
+| Data/BSS | `0x00040000–0x0007FFFF` | `data.pat` |
+| Float32 Input | `0x00080000–0x0008C3FF` | `input.pat` |
+| Stack | `0x000EE000` (grows down) | — |
 
 ---
 
@@ -278,7 +334,8 @@ cd work && ./simv +no_save
 
 **Result:** `work/run_case.report` should contain `TEST PASS`.
 
-**Performance:** ~7.7 seconds wall time, ~42.6 ms simulated time.
+**Performance:** ~82 seconds wall time, ~151 ms simulated time (with real
+float32→int8 quantization and inference).
 
 ---
 
@@ -462,7 +519,8 @@ static void __attribute__((naked, aligned(4))) trap_handler(void) {
 |------|---------|
 | `smart_run/tests/cases/conv_softmax/bare_main.c` | Bare-metal entry point |
 | `smart_run/tests/cases/conv_softmax/sbrk.c` | Heap, stubs, callback override |
-| `smart_run/tests/cases/conv_softmax/test_data.h` | Embedded model weights + dummy input |
+| `smart_run/tests/cases/conv_softmax/test_data.h` | Embedded model weights |
+| `smart_run/tests/cases/conv_softmax/input.pat` | Real input data (float32 hex) |
 | `smart_run/tests/cases/conv_softmax/stubs/sys/syscall.h` | Empty header stub |
 
 ### Modified Files
@@ -472,9 +530,9 @@ static void __attribute__((naked, aligned(4))) trap_handler(void) {
 | `smart_run/tests/cases/conv_softmax/model.c` | `CSINN_C906` → `CSINN_REF` |
 | `csi-nn2/CMakeLists.txt` | ELF build: no debug/trace, `-fno-optimize-sibling-calls`, stubs include |
 | `csi-nn2/cmake/c906_elf.cmake` | Disabled debug/trace/benchmark flags |
-| `smart_run/setup/smart_cfg.mk` | Added `conv_softmax` to CASE_LIST + build recipe |
+| `smart_run/setup/smart_cfg.mk` | Added `conv_softmax` to CASE_LIST + build recipe (copies `input.pat` after build) |
 | `smart_run/tests/lib/Makefile` | Added `EXTRA_CFLAGS` / `EXTRA_LDFLAGS` support |
-| `smart_run/logical/tb/tb.v` | Increased MAX_RUN_TIME to 30s |
+| `smart_run/logical/tb/tb.v` | Increased MAX_RUN_TIME to 30s; loads `input.pat` at `0x00080000` |
 
 ### Build Artifacts
 

@@ -40,6 +40,6 @@ static const unsigned char model_params[496] = {
 };
 
 /* Dummy int8 input data (shape: [1, 16, 28, 28], all zeros) */
-static const int8_t input_data[12544] = {0};
+/* Input data is loaded by tb.v from input.pat at address 0x00080000 */
 
 #endif /* TEST_DATA_H */
