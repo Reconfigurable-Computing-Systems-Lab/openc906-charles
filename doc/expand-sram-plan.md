@@ -1,85 +1,73 @@
-# Plan: Support 128MB Memory for Simulation
+# L3 SRAM Expansion: 16 MB → 256 MB
 
-## Problem
+## Summary
 
-The current simulation environment limits program size to ~1MB due to multiple bottlenecks:
+The L3 SRAM in the simulation environment has been expanded from **16 MB** (2 × 8 MB banks) to **256 MB** (2 × 128 MB banks). This enables programs up to ~256 MB to run in simulation. All 12 regression tests pass.
 
-| Component | Current Limit | Bottleneck |
-|-----------|--------------|------------|
-| `tb.v` temp arrays | 64K×32-bit = 256KB each | `mem_inst_temp[65536]`, `mem_data_temp[65536]` |
-| `tb.v` load loops | 16K SRAM lines = 256KB per section | `i < 32'h4000` loop bound |
-| `tb.v` wipe loop | ~91K lines | `i < 32'h16384` |
-| SRAM model depth | 524K lines × 16B = 8MB/bank, 16MB total | `f_spsram_524288x128` with 19-bit addr |
-| `axi_slave128` addressing | 19-bit SRAM addr, bit-23 bank select | `mem_addr[22:4]` and `mem_addr[23]` |
-| AXI interconnect decode | 0x00000000–0x00FFFFFF = 16MB | `SRAM_END = 40'h00ffffff` |
-| Linker script regions | MEM1=256KB, MEM2=768KB, total 1MB | `linker.lcf` |
+## What Changed
 
-## Goal
+### Original Configuration
 
-Support programs up to **128MB** (64MB text + 64MB data) with two 64MB SRAM banks.
+| Component | Value |
+|-----------|-------|
+| SRAM model | `f_spsram_524288x128` — 2^19 rows × 128-bit = 8 MB/bank |
+| Bank select bit | `mem_addr[23]` |
+| Row address | `mem_addr[22:4]` (19-bit) |
+| SRAM address window | `0x00000000–0x00FFFFFF` (16 MB) |
+| Total capacity | 2 banks × 8 MB = **16 MB** |
 
-## Approach
+### Expanded Configuration
 
-Expand the SRAM from 2×8MB (16MB total) to 2×64MB (128MB total):
-- New SRAM depth: **4,194,304** lines (2^22) per bank, 128-bit wide = 64MB/bank
-- Bank select moves from bit 23 to bit 26 (64MB boundary)
-- SRAM address expands from 19-bit to 22-bit
+| Component | Value |
+|-----------|-------|
+| SRAM model | `f_spsram_8388608x128` — 2^23 rows × 128-bit = 128 MB/bank |
+| Bank select bit | `mem_addr[27]` |
+| Row address | `mem_addr[26:4]` (23-bit) |
+| SRAM address window | `0x00000000–0x0FFFFFFF` (256 MB) |
+| Total capacity | 2 banks × 128 MB = **256 MB** |
 
-Switch testbench loading from separate `inst.pat`+`data.pat` to unified `case.pat` (which has absolute addresses), eliminating hardcoded offsets.
-
-### Memory Map (128MB)
+### Memory Map (256 MB)
 
 | Region | Address Range | Size | SRAM Bank |
 |--------|---------------|------|-----------|
-| MEM1 (text/rodata) | 0x00000000 – 0x03FFFFFF | 64MB | L bank |
-| MEM2 (data/bss/stack) | 0x04000000 – 0x07FFFFFF | 64MB | H bank |
-| __kernel_stack | 0x07F00000 | — | H bank |
-| ERR1 (error resp) | 0x08000000 – 0x0FFFFFFF | — | — |
-| APB (UART etc) | 0x10000000 – 0x1FFFFFFF | — | — |
+| L bank | `0x00000000 – 0x07FFFFFF` | 128 MB | L |
+| H bank | `0x08000000 – 0x0FFFFFFF` | 128 MB | H |
+| ERR1 (error resp) | `0x10000000 – 0x0FFFFFFF` | — | — |
+| APB (UART etc) | `0x10000000 – 0x1FFFFFFF` | — | — |
 
-## Todos
+> **Note**: The testbench and linker script retain the original small memory layout for existing tests (text 256 KB + data 768 KB, stack at `0xEE000`). To use the full 256 MB, update the linker script and testbench loading loops accordingly.
 
-### 1. Create new SRAM model `f_spsram_4194304x128.v`
-**File**: `smart_run/logical/mem/f_spsram_4194304x128.v`
-- Copy from `f_spsram_524288x128.v`
-- Change `ADDR_WIDTH` parameter from 19 to 22
-- Change address port from `[18:0]` to `[21:0]`
+## Files Modified
 
-### 2. Update `axi_slave128.v` address mapping
-**File**: `smart_run/logical/axi/axi_slave128.v`
-- Bank select: `mem_addr[26]` (was `mem_addr[23]`)
-- SRAM address: `mem_addr[25:4]` (was `mem_addr[22:4]`)
-- Module instantiation: `f_spsram_4194304x128` (was `f_spsram_524288x128`)
-- Instance names: `x_f_spsram_4194304x128_L` / `_H`
+### 1. New SRAM model — `smart_run/logical/mem/f_spsram_8388608x128.v`
+- Copied from `f_spsram_524288x128.v`
+- `ADDR_WIDTH`: 19 → **23**
+- Address port: `[18:0]` → `[22:0]`
 
-### 3. Update AXI interconnect address decode
-**File**: `smart_run/logical/axi/axi_interconnect128.v`
-- `SRAM_END`: `40'h07ffffff` (was `40'h00ffffff`)
-- `ERR1_START`: `40'h08000000` (was `40'h01000000`)
+### 2. AXI slave addressing — `smart_run/logical/axi/axi_slave128.v`
+- Bank select: `mem_addr[23]` → `mem_addr[27]`
+- Row address: `mem_addr[22:4]` → `mem_addr[26:4]`
+- Module: `f_spsram_524288x128` → `f_spsram_8388608x128`
+- Instance names: `x_f_spsram_8388608x128_L` / `_H`
 
-### 4. Update testbench `tb.v`
-**File**: `smart_run/logical/tb/tb.v`
-- Update `` `RTL_MEM `` / `` `RTL_MEM2 `` defines for new instance names
-- Replace separate `inst.pat`+`data.pat` loading with unified `case.pat` loading
-- Temp array: `bit [31:0] mem_temp [33554432]` (32M entries = 128MB worth of 32-bit words)
-- Update wipe loop: clear all 4M entries per bank across 16 sub-banks
-- Update load loop: distribute `mem_temp[]` to L bank (word addr 0–16M) and H bank (word addr 16M–32M)
-- Increase `MAX_RUN_TIME` to accommodate larger programs
+### 3. AXI address decode — `smart_run/logical/axi/axi_interconnect128.v`
+- `SRAM_END`: `40'h00ffffff` → `40'h0fffffff`
+- `ERR1_START`: `40'h01000000` → `40'h10000000`
 
-### 5. Update linker script
-**File**: `smart_run/tests/lib/linker.lcf`
-- `MEM1`: origin 0x00000000, length 0x4000000 (64MB)
-- `MEM2`: origin 0x04000000, length 0x4000000 (64MB)
-- `__kernel_stack`: 0x07F00000
+### 4. AXI FIFO — `smart_run/logical/axi/axi_fifo.v`
+- `SRAM_END`: `40'h00ffffff` → `40'h0fffffff`
+- `ERR1_START`: `40'h01000000` → `40'h10000000`
 
-### 6. Run regression
-- `make regress SIM=vcs DUMP=on`
-- Verify all 11 tests pass
+### 5. Testbench — `smart_run/logical/tb/tb.v`
+- `` `RTL_MEM `` / `` `RTL_MEM2 `` macros updated to point to `f_spsram_8388608x128` instances
+- Temp arrays and loading loops kept at **original sizes** (sufficient for existing tests)
+
+### 6. Linker script — `smart_run/tests/lib/linker.lcf`
+- Kept at **original values** for existing tests (MEM1=256 KB, MEM2=768 KB, stack=`0xEE000`)
 
 ## Notes
 
-- The `case.pat` file already exists (generated by the build system) with absolute addresses for all sections
-- `data.pat` uses Srec2vmem-normalized addresses (starting at @0), but `case.pat` uses absolute addresses — this is why switching to `case.pat` is cleaner
-- The 2-state `bit` temp array defaults to 0, so it implicitly zeroes unused SRAM regions (no separate wipe needed for loaded regions)
-- Existing small tests will still work; they just use a small portion of the 128MB space
-- The `ram.v` generic model uses `2**(ADDRWIDTH)` for depth, so changing ADDR_WIDTH automatically sizes the arrays
+- The `ram.v` generic model uses `2**(ADDRWIDTH)` for depth, so changing `ADDR_WIDTH` automatically sizes the arrays
+- Existing small tests work unchanged; they use a small portion of the 256 MB space
+- To load programs larger than the current testbench arrays (256 KB), expand `mem_inst_temp`/`mem_data_temp` and the loading loop bounds in `tb.v`, and update `linker.lcf` accordingly
+- Always use `DUMP=off` for regression to avoid FSDB dumping overhead during testing

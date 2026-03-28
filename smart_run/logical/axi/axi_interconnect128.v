@@ -356,9 +356,9 @@ wire             wvalid_s3;
 
 
   parameter SRAM_START = 40'h00000000;
-  parameter SRAM_END   = 40'h00ffffff;
+  parameter SRAM_END   = 40'h0fffffff;
 
-  parameter ERR1_START = 40'h01000000;
+  parameter ERR1_START = 40'h10000000;
   parameter ERR1_END   = 40'h0fffffff;
 
   parameter APB_START  = 40'h10000000;

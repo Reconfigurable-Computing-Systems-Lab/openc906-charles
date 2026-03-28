@@ -33,13 +33,13 @@ endif
 endif
 
 ifeq ($(SIM), vcs)
-TIMESCALE := -timescale=1ns/100fs
+TIMESCALE := -timescale=1ns/1ps
 SIMULATOR_OPT := -sverilog -full64 -kdb -lca -debug_access +nospecify +notimingchecks
 SIMULATOR_DEF := +define+no_warning +define+TSMC_NO_WARNING
 SIMULATOR_LOG := -l comp.vcs.log
 else 
     ifeq ($(SIM), nc) 
-    TIMESCALE := -timescale 1ns/100fs
+    TIMESCALE := -timescale 1ns/1ps
     SIMULATOR_OPT := +v2k -sysv +sv +access+wrc +notimingcheck -default_ext verilog -elaborate +tcl+../setup/nc.tcl
     SIMULATOR_DEF := +define+no_warning +define+TSMC_NO_WARNING +define+VMC +define+NC_SIM 
     SIMULATOR_LOG := -l comp.nc.log

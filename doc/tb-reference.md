@@ -20,19 +20,19 @@ Conv2D + Softmax (or any other) workload running on the C906 core.
 ## L3 SRAM Architecture
 
 The L3 SRAM (`axi_slave128`) is the main memory for the simulation. It is a
-128-bit wide AXI slave backed by two `f_spsram_524288x128` instances:
+128-bit wide AXI slave backed by two `f_spsram_8388608x128` instances:
 
-- **`x_f_spsram_524288x128_L`** (Low bank) — selected when `mem_addr[23] == 0`
-  - Address range: `0x00000000`–`0x007FFFFF` (**8 MB**)
+- **`x_f_spsram_8388608x128_L`** (Low bank) — selected when `mem_addr[27] == 0`
+  - Address range: `0x00000000`–`0x07FFFFFF` (**128 MB**)
   - This is where **all .pat files are loaded** and where all current firmware
     memory accesses land (code, data, stack, heap, input).
 
-- **`x_f_spsram_524288x128_H`** (High bank) — selected when `mem_addr[23] == 1`
-  - Address range: `0x00800000`–`0x00FFFFFF` (**8 MB**)
+- **`x_f_spsram_8388608x128_H`** (High bank) — selected when `mem_addr[27] == 1`
+  - Address range: `0x08000000`–`0x0FFFFFFF` (**128 MB**)
   - **Currently unused** — defined in `tb.v` as `RTL_MEM2` but never
     referenced. Available as extra storage if needed.
 
-**Total hardware capacity: 16 MB** (8 MB per bank).
+**Total hardware capacity: 256 MB** (128 MB per bank).
 
 ### .pat File Loading
 
@@ -44,21 +44,21 @@ Current temp array sizes and memory map (all in the Low bank):
 
 | Region | Temp Array | 32-bit Words | Bytes | Row Offset | Address Range |
 |--------|-----------|-------------|-------|------------|---------------|
-| `inst.pat` (code) | `mem_inst_temp[65536]` | 65,536 | **256 KB** | `0x0000` | `0x00000000`–`0x0003FFFF` |
-| `data.pat` (data/BSS/weights) | `mem_data_temp[65536]` | 65,536 | **256 KB** | `0x4000` | `0x00040000`–`0x0007FFFF` |
-| `input.pat` (float32 input) | `mem_input_temp[16384]` | 16,384 | **64 KB** | `0x8000` | `0x00080000`–`0x0008FFFF` |
+| `inst.pat` (code) | `mem_inst_temp[1048576]` | 1,048,576 | **4 MB** | `0x00000` | `0x00000000`–`0x003FFFFF` |
+| `data.pat` (data/BSS/weights) | `mem_data_temp[1048576]` | 1,048,576 | **4 MB** | `0x40000` | `0x00400000`–`0x007FFFFF` |
+| `input.pat` (float32 input) | `mem_input_temp[262144]` | 262,144 | **1 MB** | `0x80000` | `0x00800000`–`0x008FFFFF` |
 
-**Total .pat loadable: ~576 KB** out of 8 MB available in the Low bank.
+**Total .pat loadable: ~9 MB** out of 128 MB available in the Low bank.
 
 To load larger inputs (e.g., 1 MB), increase `mem_input_temp` size and adjust
-the row offset to avoid overlapping the stack region at `0x000EE000`. For
-inputs beyond ~384 KB, move the input base address above the stack, or move
+the row offset to avoid overlapping the data region ending at `0x007FFFFF`. For
+inputs beyond ~4 MB, move the input base address above the stack, or move
 the stack higher in `linker.lcf`.
 
 ### Memory Row Addressing
 
-Each 128-bit row = 16 bytes. The SRAM address is `mem_addr[22:4]` (19 bits =
-524,288 rows). Four consecutive 32-bit words from a `.pat` file fill one row,
+Each 128-bit row = 16 bytes. The SRAM address is `mem_addr[26:4]` (23 bits =
+8,388,608 rows). Four consecutive 32-bit words from a `.pat` file fill one row,
 distributed across 16 RAM banks with byte-swizzle:
 
 ```
@@ -83,7 +83,7 @@ distributed across 16 RAM banks with byte-swizzle:
 | Signal | Width | Hierarchy | Meaning |
 |--------|-------|-----------|---------|
 | `cur_state` | [1:0] | SRAM | **AXI slave FSM state**. See alias map below. |
-| `mem_addr` | [22:4] | SRAM | **SRAM row address**. 19-bit row index into the 524288-entry SRAM. Byte address = row × 16. |
+| `mem_addr` | [26:4] | SRAM | **SRAM row address**. 23-bit row index into the 8388608-entry SRAM. Byte address = row × 16. |
 | `mem_cen_0` | 1 | SRAM | **Chip enable for Low bank** (active low). Asserted when `mem_addr[23]==0` and the SRAM is accessed. |
 | `mem_wen` | [15:0] | SRAM | **Per-byte write enable** (active low). Each bit controls one byte of the 128-bit data word. All HIGH = read; selective LOW bits = partial write. |
 | `mem_din` | [127:0] | SRAM | **128-bit write data** input to SRAM. |

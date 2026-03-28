@@ -12,35 +12,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+`timescale 1ns/1ps
+
 `define NOISA
-
-
-
-
-
-
-
-
-
-
-`timescale 1ns/100fs
-`define CLK_PERIOD          1
-`define TCLK_PERIOD         4
-`define MAX_RUN_TIME        30000000000
+`define CLK_PERIOD          1.0
+`define TCLK_PERIOD         4.0
+`define MAX_RUN_TIME        3000000000
 
 `define SOC_TOP             tb.x_soc
-`define RTL_MEM             tb.x_soc.x_axi_slave128.x_f_spsram_524288x128_L
-`define RTL_MEM2            tb.x_soc.x_axi_slave128.x_f_spsram_524288x128_H
-
-
+`define RTL_MEM             tb.x_soc.x_axi_slave128.x_f_spsram_8388608x128_L
+`define RTL_MEM2            tb.x_soc.x_axi_slave128.x_f_spsram_8388608x128_H
 
 `define CPU_TOP             tb.x_soc.x_cpu_sub_system_axi.x_c906_wrapper.x_cpu_top
 `define tb_retire0          `CPU_TOP.core0_pad_retire
 `define retire0_pc          `CPU_TOP.core0_pad_retire_pc[39:0]
 `define CPU_CLK             `CPU_TOP.pll_core_cpuclk
 `define CPU_RST             `CPU_TOP.pad_cpu_rst_b
-
-
 
 module tb();
 reg clk;
@@ -81,18 +68,18 @@ end
 initial
 begin
   rst_b = 1;
-  #100;
+  #10;
   rst_b = 0;
-  #100;
+  #10;
   rst_b = 1;
 end
 
 initial
 begin
   jrst_b = 1;
-  #400;
+  #40;
   jrst_b = 0;
-  #400;
+  #40;
   jrst_b = 1;
 end
 
@@ -230,7 +217,7 @@ always @(posedge clk or negedge rst_b)
 begin
   if(!rst_b)
     cycle_count[31:0] <= 32'b1;
-  else 
+  else
     cycle_count[31:0] <= cycle_count[31:0] + 1'b1;
 end
 
@@ -246,7 +233,7 @@ begin
       $display("* Error: There is no instructions retired in the last %d cycles! *", `LAST_CYCLE);
       $display("*              Simulation Fail and Finished!                *");
       $display("*************************************************************");
-      #10;
+      #1;
       FILE = $fopen("run_case.report","a");
       $fwrite(FILE,"TEST FAIL");   
 
@@ -285,7 +272,7 @@ begin
    $display("\n**********************************************");
    $display("*    simulation finished successfully        *");
    $display("**********************************************");
-  #10;
+  #1;
    FILE = $fopen("run_case.report","a");
    $fwrite(FILE,"TEST PASS");   
    $fclose(FILE);
@@ -297,7 +284,7 @@ begin
    $display("**********************************************");
    $display("*    simulation finished with error          *");
    $display("**********************************************");
-   #10;
+   #1;
    FILE = $fopen("run_case.report","a");
    $fwrite(FILE,"TEST FAIL");   
    $fclose(FILE);

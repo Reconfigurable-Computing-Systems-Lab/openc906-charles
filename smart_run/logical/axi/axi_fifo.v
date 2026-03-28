@@ -160,7 +160,7 @@ parameter ENTRY_NUM = 8;
 parameter NUM = 3;
 
 parameter SRAM_START = 40'h00000000;
-parameter SRAM_END   = 40'h0001ffff;
+parameter SRAM_END   = 40'h0fffffff;
 
 
 

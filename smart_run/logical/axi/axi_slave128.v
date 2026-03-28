@@ -522,8 +522,8 @@ end
 
 
 
-assign mem_cen_0 = !((mem_addr[23] == 1'b0) && !mem_cen);
-assign mem_cen_1 = !((mem_addr[23] == 1'b1) && !mem_cen);
+assign mem_cen_0 = !((mem_addr[27] == 1'b0) && !mem_cen);
+assign mem_cen_1 = !((mem_addr[27] == 1'b1) && !mem_cen);
 
 always @ (posedge pll_core_cpuclk or negedge pad_cpu_rst_b)
 begin
@@ -558,8 +558,8 @@ end
 
 
 
-f_spsram_524288x128  x_f_spsram_524288x128_L (
-  .A                 (mem_addr[22:4]   ),
+f_spsram_8388608x128  x_f_spsram_8388608x128_L (
+  .A                 (mem_addr[26:4]   ),
   .CEN               (mem_cen_0        ),
   .CLK               (pll_core_cpuclk  ),
   .D                 (mem_din[127:0]   ),
@@ -578,8 +578,8 @@ f_spsram_524288x128  x_f_spsram_524288x128_L (
 
 
 
-f_spsram_524288x128  x_f_spsram_524288x128_H (
-  .A                 (mem_addr[22:4]   ),
+f_spsram_8388608x128  x_f_spsram_8388608x128_H (
+  .A                 (mem_addr[26:4]   ),
   .CEN               (mem_cen_1        ),
   .CLK               (pll_core_cpuclk  ),
   .D                 (mem_din[127:0]   ),
