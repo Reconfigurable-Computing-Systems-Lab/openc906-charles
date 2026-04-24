@@ -17,7 +17,7 @@ limitations under the License.
 `define NOISA
 `define CLK_PERIOD          1.0
 `define TCLK_PERIOD         4.0
-`define MAX_RUN_TIME        3000000000
+`define MAX_RUN_TIME        3_000_000_000.0
 
 `define SOC_TOP             tb.x_soc
 `define RTL_MEM             tb.x_soc.x_axi_slave128.x_f_spsram_8388608x128_L
@@ -87,6 +87,9 @@ integer i;
   bit [31:0] mem_inst_temp [65536];
   bit [31:0] mem_data_temp [65536];
   bit [31:0] mem_input_temp[16384];
+  // Large temp array for NN model inputs (up to 32 MB at 0x01000000)
+  parameter NN_INPUT_TEMP_SIZE = 8388608;
+  reg [31:0] mem_nn_input_temp[0:NN_INPUT_TEMP_SIZE-1];
   integer j;
   initial
   begin
@@ -116,6 +119,7 @@ integer i;
     $readmemh("inst.pat", mem_inst_temp);
     $readmemh("data.pat", mem_data_temp);
     $readmemh("input.pat", mem_input_temp);
+    $readmemh("input.pat", mem_nn_input_temp);
   
     $display("\t********* Load program to memory *********");
     i=0;
@@ -166,7 +170,8 @@ integer i;
       `RTL_MEM.ram15.mem[i+32'h4000][7:0]  = mem_data_temp[j][ 7: 0];
       j = j+1;
     end
-    // Load input.pat (float32 NN input) at address 0x00080000 (row offset 0x8000)
+    // Legacy: load input.pat at address 0x00080000 (row offset 0x8000)
+    // for backward compatibility with hand-crafted conv_softmax case
     i=0;
     for(j=0;j<32'd12544;j=j+4)
     begin
@@ -188,6 +193,32 @@ integer i;
       `RTL_MEM.ram14.mem[i+32'h8000][7:0] = mem_input_temp[j+3][15: 8];
       `RTL_MEM.ram15.mem[i+32'h8000][7:0] = mem_input_temp[j+3][ 7: 0];
     end
+    // NN model input: load input.pat at address 0x01000000 (row offset 0x100000)
+    // Supports up to 32 MB of input data; early-exits on uninitialized entries.
+    begin : nn_input_load_block
+      for(j=0; j<NN_INPUT_TEMP_SIZE; j=j+4)
+      begin
+        if (mem_nn_input_temp[j] === {32{1'bx}})
+          disable nn_input_load_block;
+        i = j / 4;
+        `RTL_MEM.ram0.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j][31:24];
+        `RTL_MEM.ram1.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j][23:16];
+        `RTL_MEM.ram2.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j][15: 8];
+        `RTL_MEM.ram3.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j][ 7: 0];
+        `RTL_MEM.ram4.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+1][31:24];
+        `RTL_MEM.ram5.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+1][23:16];
+        `RTL_MEM.ram6.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+1][15: 8];
+        `RTL_MEM.ram7.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+1][ 7: 0];
+        `RTL_MEM.ram8.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+2][31:24];
+        `RTL_MEM.ram9.mem[i+32'h100000][7:0]  = mem_nn_input_temp[j+2][23:16];
+        `RTL_MEM.ram10.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+2][15: 8];
+        `RTL_MEM.ram11.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+2][ 7: 0];
+        `RTL_MEM.ram12.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+3][31:24];
+        `RTL_MEM.ram13.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+3][23:16];
+        `RTL_MEM.ram14.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+3][15: 8];
+        `RTL_MEM.ram15.mem[i+32'h100000][7:0] = mem_nn_input_temp[j+3][ 7: 0];
+      end
+    end
   end
 
 
@@ -198,11 +229,17 @@ integer i;
 
 
 
+// Simulation timeout: configurable via +MAX_SIM_TIME=<ns> plusarg.
+// Default is MAX_RUN_TIME (3s). Supports real values for sub-ns precision.
+real max_sim_time;
 initial
 begin
-#`MAX_RUN_TIME;
+  if (!$value$plusargs("MAX_SIM_TIME=%f", max_sim_time))
+    max_sim_time = `MAX_RUN_TIME;
+  #(max_sim_time);
   $display("**********************************************");
   $display("*   meeting max simulation time, stop!       *");
+  $display("*   timeout = %0.3f ns                       ", max_sim_time);
   $display("**********************************************");
   FILE = $fopen("run_case.report","a");
   $fwrite(FILE,"TEST FAIL");   
