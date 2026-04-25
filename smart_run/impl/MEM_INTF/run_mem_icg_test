@@ -14,4 +14,6 @@
 #*/
 #*/
 #*/
-vcs +v2k -full64 -Mupdate -sverilog $DEBUSSY_PLI +define+TSMC_NO_WARNING +nospecify +notimingchecks -debug_pp -timescale=1ns/100ps +define+no_warning  -f ./filelist_c906  +libext+.sv+.inc+.h+.v+.V -R
+vcs +v2k -full64 -Mupdate -sverilog +define+TSMC_NO_WARNING +nospecify +notimingchecks -debug_pp -timescale=1ns/100ps +define+no_warning \
+    +define+BHT_16K +define+ICACHE_32K +define+DCACHE_32K +define+JTLB_ENTRY_128 \
+    -f ./filelist_c906 +libext+.sv+.inc+.h+.v+.V -l vcs.log -R

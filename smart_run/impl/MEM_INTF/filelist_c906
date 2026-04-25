@@ -1,14 +1,27 @@
-///*SPDX-License-Identifier: Apache-2.0
-//Copyright (c) 2021 Alibaba Group Holding Limited
-//Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-//The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//*/
--f ../../logical/filelists/ip.fl
+// SPDX-License-Identifier: Apache-2.0
+// Self-test filelist (no CPU RTL needed -- the testbench is purely behavioural).
+
+// TSMC 28HPC+ SP-SRAM functional models (collected under ../gen_sram/verilog/).
+../gen_sram/verilog/ts1n28hpcphvtb1024x64m8swso_180a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb1024x16m4swso_170a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb2048x32m4swso_170a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb256x59m2sw_170a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb64x58m2sw_170a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb64x88m2sw_170a_tt1v25c.v
+../gen_sram/verilog/ts1n28hpcpuhdsvtb64x98m2sw_170a_tt1v25c.v
+../gen_sram/verilog/ts5n28hpcpsvta128x8m2fw_130a_tt1v25c.v
+
+// Wrappers adapting (A,CEN,CLK,D,GWEN,Q,WEN) -> TSMC pinout.
+./aq_umc_spsram_wrappers.v
+
+// Integrated clock-gating cell (used by c906_icg_test_tb).
+// Local behavioural model -- the repo's gen_rtl version is a non-gating stub.
+./gated_clk_cell.v
+
+// Testbenches.
 ./c906_mem_icg_test_tb.v
 ./c906_bht_mem_test.v
 ./c906_dcache_mem_test.v
 ./c906_icache_mem_test.v
 ./c906_mmu_mem_test.v
 ./c906_icg_test_tb.v
-
