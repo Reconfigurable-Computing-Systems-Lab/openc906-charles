@@ -1,0 +1,6 @@
+# Synopsys Design Compiler generated outputs
+smart_run/impl/syn/batch_*/
+smart_run/impl/syn/alib-*/
+smart_run/impl/syn/*.log
+smart_run/impl/syn/*.svf
+smart_run/impl/syn/moduleparamid
