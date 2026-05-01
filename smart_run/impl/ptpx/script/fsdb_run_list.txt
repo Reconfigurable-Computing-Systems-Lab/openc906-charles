@@ -1,0 +1,14 @@
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/cache.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/conv_softmax.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/conv_softmax_part000_c906_float16.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/conv_softmax_part000_c906_float32.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/conv_softmax_part000_c906_int8_sym.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/csr.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/debug.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/exception.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/interrupt.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/ISA_FP.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/ISA_INT.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/ISA_LS.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/ISA_THEAD.fsdb
+/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/tests/regress/regress_result/MMU.fsdb

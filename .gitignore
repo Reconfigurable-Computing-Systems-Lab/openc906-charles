@@ -4,3 +4,14 @@ smart_run/impl/syn/alib-*/
 smart_run/impl/syn/*.log
 smart_run/impl/syn/*.svf
 smart_run/impl/syn/moduleparamid
+
+# PrimePower/PTPX generated outputs
+smart_run/impl/ptpx/*/
+!smart_run/impl/ptpx/script/
+!smart_run/impl/ptpx/script/**
+smart_run/impl/ptpx/ptpx_runner*.log
+smart_run/impl/ptpx/ptpx_summary.csv
+
+# Python bytecode caches
+__pycache__/
+*.pyc

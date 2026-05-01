@@ -66,7 +66,8 @@ The testbench (`smart_run/logical/tb/tb.v`) loads pattern files into L3 SRAM, ru
 - **Pattern loading**: `$readmemh()` loads `inst.pat` (65536 words = 256KB), `data.pat` (65536 words = 256KB), and `input.pat` (16384 words = 64KB, NN float32 inputs) into temp arrays, then distributes bytes across 16 RAM sub-banks in a byte-swizzled 128-bit row layout.
 - **Pass/fail detection**: Watches RTU writeback registers. A test signals PASS by writing `0x444333222` or FAIL by writing `0x2382348720` to any GPR.
 - **Deadlock detection**: Every 50,000 cycles, checks that at least one instruction has retired; otherwise declares FAIL.
-- **Timeout**: `MAX_RUN_TIME` = 3,000,000,000 time units (3s at 1ns timescale).
+- **Timeout**: `MAX_RUN_TIME` = 3,000,000,000 time units (3s at 1ns timescale). Override at runtime with the `+MAX_SIM_TIME=<value>` plusarg (e.g., `+MAX_SIM_TIME=1000000` for 1ms).
+- **NN input dual-mapping**: `input.pat` is loaded to *both* `0x00080000` (overlaps data region for small models) and `0x01000000` (independent region for larger models with relocated linker scripts).
 - **UART capture**: Monitors AXI writes to `0x10015000` and logs characters to `run_case.report`.
 - **Clock**: `CLK_PERIOD` = 1.0ns. JTAG clock (`TCLK_PERIOD`): 4.0ns. **Caution**: `CLK_PERIOD` must remain a real literal (e.g., `1.0` not `1`); integer division `1/2 = 0` in Verilog causes a zero-delay infinite loop.
 - **Waveforms**: Controlled by `DUMP=on` make variable. VCS → FSDB (`$fsdbDumpvars`), irun/iverilog → VCD (`$dumpvars`).
@@ -131,6 +132,8 @@ Available test cases (defined in `CASE_LIST` in `smart_run/setup/smart_cfg.mk`):
 
 Additional test directories exist under `smart_run/tests/cases/` (e.g., `ISA/ISA_VECTOR/`) but are not in `CASE_LIST` — add them to `smart_cfg.mk` before use.
 
+**Auto-discovered NN model cases**: Any directory `smart_run/tests/cases/model_compiled/<name>/` containing a `model.c` file is automatically appended to `CASE_LIST` via the `MODEL_CASES` glob in `smart_cfg.mk`. These reuse a generic `NN_MODEL_BUILD` recipe — no manual `_build` target needed. Drop in a HHB-generated `model.c` + weights and run `make runcase CASE=<name>` immediately.
+
 ### Test Output
 
 - Simulation log: `smart_run/work/run.{vcs,irun}.log`
@@ -151,7 +154,7 @@ Tests are assembly (`.s`) or C files in `smart_run/tests/cases/<category>/`. Eac
 3. Produces an ELF → converted via `Srec2vmem` to `inst.pat` + `data.pat` (hex patterns loaded by testbench)
 4. Signals completion by writing the magic pass/fail value to a GPR
 
-A mini C library in `smart_run/tests/lib/clib/` provides `printf()`, UART I/O, interrupt controller setup, and timers.
+A mini C library in `smart_run/tests/lib/clib/` provides `printf()`, UART I/O, interrupt controller setup, and timers. For bare-metal NN/CSI-NN2 tests, use the scaffolding in `smart_run/tests/cases/nn_model_common/` (`bare_main.c` for the entry point, `sbrk.c` for heap, `stubs/` for libc stubs) — this is what auto-discovered `model_compiled/*` cases link against.
 
 ### Adding a New Test
 
