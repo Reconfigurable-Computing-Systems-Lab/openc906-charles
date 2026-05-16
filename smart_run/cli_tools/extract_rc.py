@@ -13,6 +13,7 @@ Usage:
     python3 extract_rc.py \\
         --fsdb <path/to/file.fsdb> \\
         --type {input,output,all} \\
+        --level {*,0,1} \\
         --top  <dot.path.to.top> \\
         --out  <path/to/out.rc>
 
@@ -154,18 +155,21 @@ def find_subtree(roots, top_parts):
     return node
 
 
-def filter_tree(node, want_dirs):
+def filter_tree(node, want_dirs, max_depth=None, depth=0):
     """Return a new Module tree containing only ports whose direction is
-    in want_dirs and that are not clocks/resets. Drops modules whose
-    entire subtree has no port."""
+    in want_dirs and that are not clocks/resets, limited to max_depth
+    below the selected top module. Drops modules whose entire subtree has
+    no port."""
     new = Module(node.name)
     new.ports = [
         (leaf, d)
         for (leaf, d) in node.ports
         if d in want_dirs and not is_clk_or_reset(leaf)
     ]
+    if max_depth is not None and depth >= max_depth:
+        return new
     for inst, child in node.children.items():
-        fc = filter_tree(child, want_dirs)
+        fc = filter_tree(child, want_dirs, max_depth, depth + 1)
         if fc.ports or fc.children:
             new.children[inst] = fc
     return new
@@ -261,11 +265,21 @@ def emit_rc(out_path, fsdb_path, top_parts, root_node):
 
 def _emit_module_body(lines, node, slash_path):
     """Emit signals of `node` then recurse into its children as
-    addSubGroup/endSubGroup blocks."""
-    for leaf, _dir in node.ports:
-        lines.append(
-            f"addSignal -h 16 -UNSIGNED -HEX {slash_path}/{leaf}\n"
-        )
+    addSubGroup/endSubGroup blocks.
+
+    Verdi uses the first absolute signal path in a group to establish the
+    current scope; subsequent signals in that group should use -holdScope so
+    nested addSubGroup blocks are displayed under the intended parent.
+    """
+    for idx, (leaf, _dir) in enumerate(node.ports):
+        if idx == 0:
+            lines.append(
+                f"addSignal -h 16 -UNSIGNED -HEX {slash_path}/{leaf}\n"
+            )
+        else:
+            lines.append(
+                f"addSignal -h 16 -UNSIGNED -HEX -holdScope {leaf}\n"
+            )
     for inst, child in node.children.items():
         lines.append(f'addSubGroup "{inst}"\n')
         _emit_module_body(lines, child, f"{slash_path}/{inst}")
@@ -289,6 +303,15 @@ def main():
         help="which port directions to extract",
     )
     p.add_argument(
+        "--level",
+        required=True,
+        choices=["*", "0", "1"],
+        help=(
+            "module hierarchy depth to extract: '*' for top and all "
+            "submodules, '0' for only top, '1' for top and direct submodules"
+        ),
+    )
+    p.add_argument(
         "--top",
         required=True,
         help="hierarchical path of the top module, dot- or slash-separated "
@@ -303,12 +326,13 @@ def main():
         want = {"output"}
     else:
         want = {"input", "output", "inout"}
+    max_depth = None if args.level == "*" else int(args.level)
 
     text = run_fsdbdebug(args.fsdb)
     roots = parse_tree(text)
     top_parts = normalise_top(args.top)
     top_node = find_subtree(roots, top_parts)
-    filtered = filter_tree(top_node, want)
+    filtered = filter_tree(top_node, want, max_depth)
 
     if not filtered.ports and not filtered.children:
         sys.exit(
@@ -323,7 +347,7 @@ def main():
     n_ports, n_mods = _stats(filtered)
     print(
         f"wrote {args.out}: {n_ports} signals across {n_mods} modules "
-        f"(type={args.type}, top={'.'.join(top_parts)})"
+        f"(type={args.type}, level={args.level}, top={'.'.join(top_parts)})"
     )
 
 

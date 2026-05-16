@@ -55,6 +55,7 @@ _TIME_UNIT_PS = {
 }
 
 ADD_SIGNAL_RE = re.compile(r"^addSignal\b.*?\s(/\S+)\s*$")
+HOLD_SCOPE_SIGNAL_RE = re.compile(r"^addSignal\b.*?\s-holdScope\s+(\S+)\s*$")
 
 
 # ---------------------------------------------------------------------------
@@ -64,11 +65,18 @@ ADD_SIGNAL_RE = re.compile(r"^addSignal\b.*?\s(/\S+)\s*$")
 def parse_rc_signals(rc_path: str) -> List[str]:
     """Return list of signal paths found in `addSignal` lines."""
     sigs: List[str] = []
+    current_scope: Optional[str] = None
     with open(rc_path) as f:
         for ln in f:
             m = ADD_SIGNAL_RE.match(ln)
             if m:
-                sigs.append(m.group(1))
+                sig = m.group(1)
+                sigs.append(sig)
+                current_scope = sig.rsplit("/", 1)[0]
+                continue
+            m = HOLD_SCOPE_SIGNAL_RE.match(ln)
+            if m and current_scope:
+                sigs.append(f"{current_scope}/{m.group(1)}")
     if not sigs:
         raise RuntimeError(f"no addSignal entries found in rc: {rc_path}")
     return sigs
@@ -339,9 +347,9 @@ def main():
     ap.add_argument("--end", type=int, default=None,
                     help="end time in ns (>=0, optional)")
     ap.add_argument("--func-rc", default=None,
-                    help="rc file with addSignal lines for func sim (optional)")
+                    help="rc file with addSignal lines for func sim")
     ap.add_argument("--pwr-rc", default=None,
-                    help="rc file with addSignal lines for pwr sim (optional)")
+                    help="rc file with addSignal lines for pwr sim")
     ap.add_argument("--mode", required=True, choices=["func-sim", "pwr-sim", "all"])
     ap.add_argument("--processes", type=int, required=True,
                     help="number of parallel worker processes (>0)")
@@ -365,11 +373,23 @@ def main():
         sys.exit("error: --end must be >= 0")
     if args.start is not None and args.end is not None and args.end <= args.start:
         sys.exit("error: --end must be > --start")
+    if args.mode in ("func-sim", "all") and not args.func_rc:
+        sys.exit("error: --func-rc is required when --mode is func-sim or all")
+    if args.mode in ("pwr-sim", "all") and not args.pwr_rc:
+        sys.exit("error: --pwr-rc is required when --mode is pwr-sim or all")
 
     period_ns = args.clk_period / args.downsample
 
-    func_signals = parse_rc_signals(args.func_rc) if args.func_rc else None
-    pwr_signals = parse_rc_signals(args.pwr_rc) if args.pwr_rc else None
+    func_signals = (
+        parse_rc_signals(args.func_rc)
+        if args.mode in ("func-sim", "all")
+        else None
+    )
+    pwr_signals = (
+        parse_rc_signals(args.pwr_rc)
+        if args.mode in ("pwr-sim", "all")
+        else None
+    )
 
     rows = _load_summary(args.summary_csv, args.include_failed)
     if args.only_job:
