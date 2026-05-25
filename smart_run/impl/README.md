@@ -116,13 +116,25 @@ python3 smart_run/impl/syn/rpt2csv.py \
     syn/batch_<YYYYMMDD_HH>/reports/openC906.mapped.area_hier.rpt \
     -o area_hier.csv
 
-# (b) Power + functional FSDBs -> pandas pickles (parallel, uses fsdbreport)
+# (b) Presim waveform + rc signal list -> fsdbreport CSVs
 cd smart_run/impl/ptpx/script
-~/anaconda3/bin/python fsdb_to_dataframe.py        # reads ../ptpx_summary.csv
-                                                   # writes ../db/<case>_{pwr,func}.pkl
+~/anaconda3/bin/python fsdb_to_csv.py \
+    --summary-csv ../ptpx_summary.csv \
+    --clk-period 1 \
+    --downsample 10 \
+    --func-rc ../../../key_signal.rc \
+    --mode func-sim \
+    --processes 8 \
+    --out-dir ../presim_db
 
-# (c) Sanity check: fraction of all-zero feature rows per pickle
-~/anaconda3/bin/python calc_zero_sample_ratio.py
+# (c) fsdbreport CSVs -> pandas pickles
+~/anaconda3/bin/python csv_to_pkl.py \
+    --indir ../presim_db/_csv \
+    --downsample 10 \
+    --processes 8 \
+    --out-dir ../presim_db \
+    --rm-prefix
+
 ```
 
 ## Outputs map
@@ -132,4 +144,4 @@ cd smart_run/impl/ptpx/script
 | 1. SRAM | `gen_sram/{verilog,db}/` | `*.v`, `*_tt1v25c.db` |
 | 2. Syn  | `syn/batch_<YYYYMMDD_HH>/{reports,results}/` | `openC906.mapped.{v,ddc,sdc,sdf}`, `ptpxmap.tcl`, qor/area/timing/power rpts |
 | 3. PTPX | `ptpx/<case>/{reports,results}/`, `ptpx/ptpx_summary.csv` | `openC906_pwr.fsdb`, power/timing rpts |
-| 4. Data | `*.csv`, `ptpx/db/*.pkl` | area CSV, per-case `_pwr.pkl` / `_func.pkl` |
+| 4. Data | `*.csv`, `ptpx/presim_db/_csv/*.csv`, `ptpx/presim_db/*.pkl` | area CSV, per-case presim `_func.csv` / `_func.pkl` |
