@@ -131,41 +131,41 @@ elaborate ${TOP_MODULE_NAME}
 # store the unmapped results
 write -hierarchy -format ddc -output ${BATCH_DIR}/results/${TOP_MODULE_NAME}.unmapped.ddc
 
-################################################################################
-# Preserve selected C906 core hierarchy boundaries
-################################################################################
-# The source paths come from testbench waveform hierarchy under x_cpu_top. In
-# synthesis, x_cpu_top is TOP_MODULE_NAME, so these paths are relative to openC906.
-set PRESERVE_HIER_CELLS [list \
-    x_aq_top_0/x_aq_core/x_aq_cp0_top \
-    x_aq_top_0/x_aq_core/x_aq_iu_top \
-    x_aq_top_0/x_aq_core/x_aq_lsu_top \
-    x_aq_top_0/x_aq_core/x_aq_rtu_top \
-    x_aq_top_0/x_aq_core/x_aq_vidu_top \
-    x_aq_top_0/x_aq_core/x_aq_vpu_top \
-]
+# ################################################################################
+# # Preserve selected C906 core hierarchy boundaries
+# ################################################################################
+# # The source paths come from testbench waveform hierarchy under x_cpu_top. In
+# # synthesis, x_cpu_top is TOP_MODULE_NAME, so these paths are relative to openC906.
+# set PRESERVE_HIER_CELLS [list \
+#     x_aq_top_0/x_aq_core/x_aq_cp0_top \
+#     x_aq_top_0/x_aq_core/x_aq_iu_top \
+#     x_aq_top_0/x_aq_core/x_aq_lsu_top \
+#     x_aq_top_0/x_aq_core/x_aq_rtu_top \
+#     x_aq_top_0/x_aq_core/x_aq_vidu_top \
+#     x_aq_top_0/x_aq_core/x_aq_vpu_top \
+# ]
 
-set preserve_hier_rpt [open ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.preserve_hierarchy.rpt w]
-puts $preserve_hier_rpt "Preserved hierarchy cells for ${TOP_MODULE_NAME}"
-puts $preserve_hier_rpt "Instance Path                                      Reference"
-puts $preserve_hier_rpt "----------------------------------------------------------------"
+# set preserve_hier_rpt [open ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.preserve_hierarchy.rpt w]
+# puts $preserve_hier_rpt "Preserved hierarchy cells for ${TOP_MODULE_NAME}"
+# puts $preserve_hier_rpt "Instance Path                                      Reference"
+# puts $preserve_hier_rpt "----------------------------------------------------------------"
 
-foreach inst $PRESERVE_HIER_CELLS {
-    set cell [get_cells -quiet $inst]
-    if {[sizeof_collection $cell] == 0} {
-        puts "Fatal: hierarchy boundary not found after elaborate: $inst"
-        puts $preserve_hier_rpt "MISSING: $inst"
-        close $preserve_hier_rpt
-        exit 1
-    }
+# foreach inst $PRESERVE_HIER_CELLS {
+#     set cell [get_cells -quiet $inst]
+#     if {[sizeof_collection $cell] == 0} {
+#         puts "Fatal: hierarchy boundary not found after elaborate: $inst"
+#         puts $preserve_hier_rpt "MISSING: $inst"
+#         close $preserve_hier_rpt
+#         exit 1
+#     }
 
-    set_ungroup $cell false
-    set_dont_touch $cell true
+#     set_ungroup $cell false
+#     set_dont_touch $cell true
 
-    puts $preserve_hier_rpt [format "%-50s %s" \
-        [get_object_name $cell] [get_attribute $cell ref_name]]
-}
-close $preserve_hier_rpt
+#     puts $preserve_hier_rpt [format "%-50s %s" \
+#         [get_object_name $cell] [get_attribute $cell ref_name]]
+# }
+# close $preserve_hier_rpt
 
 ################################################################################
 # Step 3: constrain your design
@@ -200,13 +200,12 @@ check_design > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.check_design.rpt
 ################################################################################
 # Step 4: compile the design
 ################################################################################
-compile_ultra
+# compile with High-effort area optimization
+# compile_ultra
+# optimize_netlist -area
 
 # Optional: keep hierarchy for debug
-# compile_ultra -no_autoungroup
-
-# High-effort area optimization
-# optimize_netlist -area
+compile_ultra -no_autoungroup
 
 ################################################################################
 # Step 5: write out final design and reports

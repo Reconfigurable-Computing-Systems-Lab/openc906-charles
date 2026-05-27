@@ -90,8 +90,10 @@ if {$parent_path==""} {
 ################################################################################
 # Generated Clock: PLIC
 ################################################################################
-create_generated_clock -name PLIC_CLK -source [get_attribute [get_clocks $CPU_CLK_NAME] sources] -edges {1 2 5} \
-   [filter [get_flat_pins ${parent_path}x_aq_mp_clk_top?x_apb_gated_clk*x_gated_clk_cell*] direction==out]
+create_generated_clock -name PLIC_CLK \
+   -source [get_pins x_aq_mp_clk_top/apb_clk_buf/I] \
+   -edges {1 2 5} \
+   [get_pins x_aq_mp_clk_top/apb_clk_buf/O]
 set_multicycle_path -from $CPU_CLK_NAME -to PLIC_CLK -setup 2 -start
 set_multicycle_path -from $CPU_CLK_NAME -to PLIC_CLK -hold  1 -start
 set_multicycle_path -to $CPU_CLK_NAME -from PLIC_CLK -setup 2 -end
@@ -208,8 +210,10 @@ group_path -name INPUT  -from [all_inputs]
 group_path -name OUTPUT -to [all_outputs]
 group_path -name COMBO  -from [all_inputs] -to [all_outputs]
 
-set_clock_uncertainty -setup $SETUP_UNCERTAINTY [all_clocks]
-set_clock_uncertainty -hold $HOLD_UNCERTAINTY [all_clocks]
+if {$IF_READ_BUIDIN_VARIABLES} {
+  set_clock_uncertainty -setup $SETUP_UNCERTAINTY [all_clocks]
+  set_clock_uncertainty -hold $HOLD_UNCERTAINTY [all_clocks]
+}
 
 ################################################################################
 # Set DFT Signals

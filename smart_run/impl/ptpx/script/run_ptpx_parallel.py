@@ -15,19 +15,22 @@ Use the conda Python in ``~/anaconda3``:
 Example usage
 -------------
 # Using a list file (recommended for many FSDBs):
-~/anaconda3/bin/python run_ptpx_parallel.py \
-    --in_dir /path/to/syn/batch_dir \
+python run_ptpx_parallel.py \
+    --in_dir /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/syn/batch_20260525_06 \
+    --max_jobs 8 \
+    --timeout 259200 \
     --clk_period 1 \
+    --skip_completed \
     --fsdb_list_file fsdb_run_list.txt
 
 # Using explicit FSDB paths:
-~/anaconda3/bin/python run_ptpx_parallel.py \
+python run_ptpx_parallel.py \
     --in_dir /path/to/syn/batch_dir \
     --clk_period 1 \
     --fsdb_names /path/to/a.fsdb /path/to/b.fsdb
 
 # Full options:
-~/anaconda3/bin/python run_ptpx_parallel.py \
+python run_ptpx_parallel.py \
     --in_dir /path/to/syn/batch_dir \
     --clk_period 1 \
     --fsdb_list_file fsdb_run_list.txt \
