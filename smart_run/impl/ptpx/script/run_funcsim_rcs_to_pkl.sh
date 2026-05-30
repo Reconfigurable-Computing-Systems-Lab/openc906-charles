@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Convert func-sim FSDBs listed in ptpx_summary.csv for every rc file under
-# ../rc, then convert each generated CSV directory to pickle files.
+# ../rc directly to pickle files.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PTPX_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -14,23 +14,23 @@ OUT_ROOT="${OUT_ROOT:-${PTPX_DIR}/presim_db}"
 CLK_PERIOD="${CLK_PERIOD:-1}"
 DOWNSAMPLE="${DOWNSAMPLE:-10}"
 PROCESSES="${PROCESSES:-8}"
-RM_CSV=0
 
 START_ARG=()
 END_ARG=()
 ONLY_JOB_ARG=()
 INCLUDE_FAILED_ARG=()
+SKIP_EXIST_ARG=()
 
 usage() {
     cat <<'EOF'
 Usage: run_funcsim_rcs_to_pkl.sh [options]
 
-Run fsdb_to_csv.py followed by csv_to_pkl.py for every *.rc under:
+Run fsdb_to_pkl.py for every *.rc under:
   ../rc
 
 Example Use:
     cd /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/script
-    ./run_funcsim_rcs_to_pkl.sh --out-root /dfs/grphome/eeweiz/jjiangan --rm-csv
+    ./run_funcsim_rcs_to_pkl.sh --out-root /dfs/grphome/eeweiz/jjiangan
 
 Options:
   --summary-csv PATH   ptpx summary CSV (default: ../ptpx_summary.csv)
@@ -38,13 +38,13 @@ Options:
   --out-root DIR       output root (default: ../presim_db)
   --clk-period N       clock period in ns (default: 1)
   --downsample N       downsample factor (default: 10)
-  --processes N        worker processes for both steps (default: 8)
+  --processes N        worker processes (default: 8)
   --python PATH        Python executable (default: ~/anaconda3/bin/python)
-  --start N            optional start time in ns passed to fsdb_to_csv.py
-  --end N              optional end time in ns passed to fsdb_to_csv.py
+  --start N            optional start time in ns passed to fsdb_to_pkl.py
+  --end N              optional end time in ns passed to fsdb_to_pkl.py
   --only-job NAME      optional single Job from ptpx_summary.csv
   --include-failed     also process rows whose Status != COMPLETED
-  --rm-csv             remove generated CSV files after pickle conversion
+  --skip-exist         skip jobs whose output pickle already exists
   -h, --help           show this help
 
 Environment variables with the same uppercase names can also override defaults.
@@ -99,8 +99,8 @@ while [[ $# -gt 0 ]]; do
             INCLUDE_FAILED_ARG=(--include-failed)
             shift
             ;;
-        --rm-csv)
-            RM_CSV=1
+        --skip-exist)
+            SKIP_EXIST_ARG=(--skip-exist)
             shift
             ;;
         -h|--help)
@@ -146,8 +146,8 @@ for rc_path in "${rc_files[@]}"; do
     out_dir="${OUT_ROOT}/${rc_rel_no_ext}"
 
     echo
-    echo "==> ${rc_rel_no_ext}: fsdb_to_csv"
-    "${PYTHON_BIN}" "${SCRIPT_DIR}/fsdb_to_csv.py" \
+    echo "==> ${rc_rel_no_ext}: fsdb_to_pkl"
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/fsdb_to_pkl.py" \
         --summary-csv "${SUMMARY_CSV}" \
         --clk-period "${CLK_PERIOD}" \
         --downsample "${DOWNSAMPLE}" \
@@ -155,28 +155,12 @@ for rc_path in "${rc_files[@]}"; do
         --mode func-sim \
         --processes "${PROCESSES}" \
         --out-dir "${out_dir}" \
+        --rm-prefix \
         "${START_ARG[@]}" \
         "${END_ARG[@]}" \
         "${ONLY_JOB_ARG[@]}" \
-        "${INCLUDE_FAILED_ARG[@]}"
-
-    echo "==> ${rc_rel_no_ext}: csv_to_pkl"
-    "${PYTHON_BIN}" "${SCRIPT_DIR}/csv_to_pkl.py" \
-        --indir "${out_dir}/_csv" \
-        --downsample "${DOWNSAMPLE}" \
-        --processes "${PROCESSES}" \
-        --out-dir "${out_dir}" \
-        --rm-prefix
-
-    if [[ "${RM_CSV}" -eq 1 ]]; then
-        shopt -s nullglob
-        csv_files=("${out_dir}/_csv/"*.csv)
-        shopt -u nullglob
-        if [[ ${#csv_files[@]} -gt 0 ]]; then
-            echo "==> ${rc_rel_no_ext}: removing ${#csv_files[@]} CSV file(s)"
-            rm -- "${csv_files[@]}"
-        fi
-    fi
+        "${INCLUDE_FAILED_ARG[@]}" \
+        "${SKIP_EXIST_ARG[@]}"
 done
 
 echo
