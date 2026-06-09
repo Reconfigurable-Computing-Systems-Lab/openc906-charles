@@ -6,14 +6,15 @@ Reads ptpx_summary.csv, runs Synopsys fsdbreport for every selected job's
 functional FSDB and/or power FSDB, converts each generated CSV to a pickle, and
 removes that CSV immediately after its pickle is written successfully.
 
-Example:
-    ./fsdb_to_pkl.py --summary-csv ../ptpx_summary.csv --clk-period 1 \
-        --downsample 10 --func-rc func.rc --mode func-sim \
-        --processes 8 --out-dir ../funcsim_db --rm-prefix
+Example - func sim:
+./fsdb_to_pkl.py --summary-csv ../ptpx_summary.csv --clk-period 1 \
+    --downsample 10 --func-rc func.rc --mode func-sim \
+    --processes 8 --out-dir ../funcsim_db --rm-prefix
 
-    ./fsdb_to_pkl.py --summary-csv ../ptpx_summary.csv --clk-period 1 \
-        --downsample 1 --pwr-rc pwr.rc --mode pwr-sim \
-        --processes 8 --out-dir ../pwrsim_db --rm-prefix
+Example - pwr sim:
+./fsdb_to_pkl.py --summary-csv /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/ptpx_summary.csv --clk-period 1 \
+    --downsample 1 --pwr-rc /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/rc/aq_core_pwr.rc --mode pwr-sim \
+    --processes 1 --out-dir /dfs/grphome/eeweiz/jjiangan/pwr --rm-prefix
 """
 
 from __future__ import annotations
