@@ -6,7 +6,7 @@ viewPort 0 11 3840 849 495 65
 
 ; File list:
 ; openDirFile [-d delimiter] [-s time_offset] [-rf auto_bus_rule_file] path_name file_name
-openDirFile -d / "" "/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/work/novas.fsdb"
+openDirFile -d / "" "/dfs/usrhome/jjiangan/github/hw_charles/smart_run/work/novas.fsdb"
 
 ; file time scale:
 ; fileTimeScale ### s|ms|us|ns|ps
@@ -469,7 +469,7 @@ nalias REGACC_G_2_DSC0		4'b0110		NULL
 nalias REGACC_C_2_X6		4'b0111		NULL
 
 addGroup "CPU Clock"
-activeDirFile "" "/dfs/usrhome/jjiangan/github/openc906-charles/smart_run/work/novas.fsdb"
+activeDirFile "" "/dfs/usrhome/jjiangan/github/hw_charles/smart_run/work/novas.fsdb"
 addSignal -h 16 /tb/x_soc/x_cpu_sub_system_axi/x_c906_wrapper/x_cpu_top/forever_cpuclk
 addGroup "L3 SRAM (axi_slave128)"
 aliasname axi_slave128.cur_state

@@ -1,7 +1,7 @@
 ################################################################################
 # User configuration
 ################################################################################
-set PROJ_ROOT       /dfs/usrhome/jjiangan/github/openc906-charles-imp
+set PROJ_ROOT       /dfs/usrhome/jjiangan/github/hw_charles
 set RTL_ROOT        ${PROJ_ROOT}/C906_RTL_FACTORY
 set SDC_ROOT        ${PROJ_ROOT}/smart_run/impl/sdc
 set TOP_MODULE_NAME openC906
@@ -108,15 +108,22 @@ set all_rtl_files [read_filelist ${RTL_ROOT}/gen_rtl/filelists/C906_asic_rtl.fl]
 #                              TSMC 28HPC+ hard macros (TS1N28HPCPU... /
 #                              TS5N28HPCP...) which are linked from the .db
 #                              files in smart_run/impl/gen_sram/db/.
+#   * gated_clk_cell_syn.v   — replaces gen_rtl/clk/rtl/gated_clk_cell.v (a
+#                              non-gating pass-through stub) with a version that
+#                              instantiates the TSMC integrated clock-gating
+#                              cell, so the RTL's hand-instantiated clock gates
+#                              become real ICGs in the netlist.
 set asic_rtl_files {}
 foreach f $all_rtl_files {
     if {[string match "*/gen_rtl/fpga/rtl/aq_f_spsram_*.v" $f]} continue
+    if {[string match "*/gen_rtl/clk/rtl/gated_clk_cell.v" $f]} continue
     lappend asic_rtl_files $f
 }
 set MEM_INTF_DIR ${PROJ_ROOT}/smart_run/impl/MEM_INTF
 set SYN_DIR      ${PROJ_ROOT}/smart_run/impl/syn
 lappend asic_rtl_files \
     ${SYN_DIR}/aq_f_spsram_shim.v \
+    ${SYN_DIR}/gated_clk_cell_syn.v \
     ${MEM_INTF_DIR}/aq_umc_spsram_wrappers.v
 
 # Analyze RTL
@@ -198,14 +205,35 @@ check_design -summary
 check_design > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.check_design.rpt
 
 ################################################################################
-# Step 4: compile the design
+# Step 4: compile the design (with register clock gating)
 ################################################################################
+# Register clock gating: infer integrated clock-gating (ICG) cells on register
+# banks whose enables DC can extract. The library ICGs (CKLNQD*) have a
+# test-enable pin; tie the control point before the latch so scan can force
+# clocks on. -minimum_bitwidth 4 avoids gating tiny banks where the ICG costs
+# more than it saves.
+set_clock_gating_style \
+    -sequential_cell latch \
+    -positive_edge_logic {integrated} \
+    -negative_edge_logic  {integrated} \
+    -control_point before \
+    -control_signal scan_enable \
+    -minimum_bitwidth 4 \
+    -max_fanout 32
+
+# Protect the hand-instantiated ICGs from gated_clk_cell_syn.v: DC may resize
+# them but must not remove or restructure the clock-gate function.
+set icg_insts [get_cells -quiet -hierarchical -filter "ref_name =~ CKLNQD*"]
+if {[sizeof_collection $icg_insts] > 0} {
+    set_size_only $icg_insts true
+}
+
 # compile with High-effort area optimization
 # compile_ultra
 # optimize_netlist -area
 
-# Optional: keep hierarchy for debug
-compile_ultra -no_autoungroup
+# Keep hierarchy for debug; -gate_clock enables register clock-gating insertion
+compile_ultra -no_autoungroup -gate_clock
 
 ################################################################################
 # Step 5: write out final design and reports
@@ -224,6 +252,8 @@ saif_map -type ptpx -write_map ${BATCH_DIR}/results/${TOP_MODULE_NAME}.ptpxmap.t
 report_saif -hier -rtl -missing > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.saif_annotation.rpt
 
 # Generate reports
+report_clock_gating -gating_elements \
+  > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.mapped.clock_gating.rpt
 report_qor > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.mapped.qor.rpt
 report_timing -transition_time -nets -attribute -nosplit \
   > ${BATCH_DIR}/reports/${TOP_MODULE_NAME}.mapped.timing.rpt

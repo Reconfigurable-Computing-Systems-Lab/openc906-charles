@@ -29,7 +29,7 @@ Run fsdb_to_pkl.py for every *.rc under:
   ../rc
 
 Example Use:
-    cd /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/script
+    cd /dfs/usrhome/jjiangan/github/hw_charles/smart_run/impl/ptpx/script
     ./run_funcsim_rcs_to_pkl.sh --out-root /dfs/grphome/eeweiz/jjiangan
 
 Options:

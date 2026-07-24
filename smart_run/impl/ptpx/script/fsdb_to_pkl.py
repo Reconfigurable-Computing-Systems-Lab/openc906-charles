@@ -12,8 +12,8 @@ Example - func sim:
     --processes 8 --out-dir ../funcsim_db --rm-prefix
 
 Example - pwr sim:
-./fsdb_to_pkl.py --summary-csv /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/ptpx_summary.csv --clk-period 1 \
-    --downsample 1 --pwr-rc /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/ptpx/rc/aq_core_pwr.rc --mode pwr-sim \
+./fsdb_to_pkl.py --summary-csv /dfs/usrhome/jjiangan/github/hw_charles/smart_run/impl/ptpx/ptpx_summary.csv --clk-period 1 \
+    --downsample 1 --pwr-rc /dfs/usrhome/jjiangan/github/hw_charles/smart_run/impl/ptpx/rc/aq_core_pwr.rc --mode pwr-sim \
     --processes 1 --out-dir /dfs/grphome/eeweiz/jjiangan/pwr --rm-prefix
 """
 

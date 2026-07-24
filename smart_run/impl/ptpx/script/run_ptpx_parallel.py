@@ -1,4 +1,4 @@
-#!/staff/ee/jjiangan/anaconda3/bin/python
+#!/usr/bin/env python3
 """run_ptpx_parallel.py - Parallel PrimePower (PTPX) job runner.
 
 Launches ``pwr_shell`` for each FSDB file in parallel with configurable
@@ -16,7 +16,7 @@ Example usage
 -------------
 # Using a list file (recommended for many FSDBs):
 python run_ptpx_parallel.py \
-    --in_dir /dfs/usrhome/jjiangan/github/openc906-charles-imp/smart_run/impl/syn/batch_20260525_06 \
+    --in_dir /dfs/usrhome/jjiangan/github/hw_charles/smart_run/impl/syn/batch_20260525_06 \
     --max_jobs 8 \
     --timeout 259200 \
     --clk_period 1 \
