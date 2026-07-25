@@ -1,0 +1,21 @@
+                                             
+ Block      Pattern                   Result
+---------------------------------------------
+0         ISA_FP                         PASS
+1         ISA_INT                        PASS
+2         ISA_LS                         PASS
+3         ISA_THEAD                      PASS
+4         MMU                            PASS
+5         cache                          PASS
+6         conv_softmax                   PASS
+7         conv_softmax_part000_c906_float16         PASS
+8         conv_softmax_part000_c906_float32         PASS
+9         conv_softmax_part000_c906_int8_sym         PASS
+10        coremark                       PASS
+11        csr                            PASS
+12        debug                          PASS
+13        exception                      PASS
+14        interrupt                      PASS
+---------------------------------------------
+ Not run   Pass   Fail   Total
+   0       15      0      15
