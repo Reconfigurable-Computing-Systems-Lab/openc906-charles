@@ -29,7 +29,7 @@ risky construct (real-delay clockgen, `#(real)` timeout, `$value$plusargs("%f")`
 required for the NN path (see Bugs 1–2).
 
 ### 2. macOS toolchain / build glue
-- `setup/local_setup.sh`: bash replacement for the server csh setup
+- `setup/mac_setup.sh`: bash replacement for the server csh setup
   (`CODE_BASE_PATH`, `TOOL_EXTENSION`, `CONVERT`, `THEAD_GCC=0`).
 - xPack `riscv-none-elf-gcc` 15.2 with a `riscv64-unknown-elf-*` symlink farm.
 - `tests/bin/srec2vmem.py`: pure-Python replacement for the Linux-x86 `Srec2vmem`.
@@ -85,19 +85,37 @@ The reference fp32 kernels run ~100 cyc/MAC in sim (cross-TU index/callback
 overhead; no RVV on this GCC). MobileNetV2 at 224×224 is ~300M MACs (~hours even
 split) so the flow runs the real network (real weights, all 170 nodes, opset 17)
 at reduced input resolution — MobileNetV2 is fully convolutional and accepts any
-HxW. 64×64 ≈ 25M MACs, split into 10 parallel segments (~45 min wall).
+HxW. 64×64 ≈ 25M MACs, split into 10 parallel segments (~90 min wall);
+32×32 ≈ 6.2M MACs, same 10 cut points (~60 min wall — per-MAC cycle cost
+roughly triples on the tiny late-stage maps, so wall shrinks only ~1.5×,
+gated by seg08 at 394 ms sim). At 32×32 the head runs on 1×1 feature maps
+(3×3/pad-1 depthwise on 1×1, GAP over 1×1) — all 10 segments PASS (2026-07-25,
+sim times 44–394 ms, ~115 kHz effective under 10-way parallel load).
+
+Reduced-resolution variants are produced by `scripts/make_onnx_variant.py` from
+the pristine 224×224 zoo model: it clears stale `value_info` (shape inference
+does **not** overwrite pre-populated entries — resizing `mbv2_64.onnx` directly
+would bake 64-based shapes into `model.c` while the blob holds new-res data),
+rewrites input H/W, re-infers shapes, and emits the matching `random_input.npz`
+(`np.random.seed(7); randn` — reproduces the original mbv2_64/mbv2_96 inputs
+bit-exact). It self-checks the result through onnxruntime.
 
 ## Reproduce (Verilator, macOS)
 
 ```
-source smart_run/setup/local_setup.sh
+source smart_run/setup/mac_setup.sh
 cd smart_run && make compile SIM=verilator DUMP=off          # verilate once
-# real MobileNetV2 (opset 17) segments at 64x64, run in parallel:
-python3 scripts/gen_segments.py --onnx ../hhb/model/mbv2_64/mbv2_64.onnx \
-    --input-npz ../hhb/model/mbv2_64/random_input.npz --prefix mb64 \
+# make a reduced-resolution MobileNetV2 (here 32x32) + input:
+python3 scripts/make_onnx_variant.py --hw 32 --out-dir ../hhb/model/mbv2_32
+# cut into parallel-verifiable segments:
+python3 scripts/gen_segments.py --onnx ../hhb/model/mbv2_32/mbv2_32.onnx \
+    --input-npz ../hhb/model/mbv2_32/random_input.npz --prefix mb32 \
     --out-root tests/cases/model_compiled --target-segments 12
-bash scripts/run_parallel_models.sh 8e9 mb64_seg00 mb64_seg01 ... mb64_seg09
+bash scripts/run_parallel_models.sh 8e9 mb32_seg00 mb32_seg01 ... mb32_seg09
 ```
+
+The 64×64 run is identical with `--hw 64` / prefix `mb64` (results preserved in
+`work_par_mb64/`).
 
 ## VCS backend + per-segment FSDB (for PrimePower)
 
@@ -126,11 +144,11 @@ dumps its **own FSDB — there is no merge**.
   `fsdb_run_list.txt`.
 
 ```
-# on a VCS/Verdi machine:
-source smart_run/setup/local_setup.sh
+# on a VCS/Verdi machine (same generated case dirs as the Verilator run):
+source smart_run/setup/example_setup.csh   # server csh setup, edited paths
 cd smart_run
 python3 scripts/smart_runner.py regress --sim vcs --dump on -j 8 \
-    --cases mb64_seg00,mb64_seg01,...,mb64_seg09
+    --cases mb32_seg00,mb32_seg01,...,mb32_seg09
 # -> tests/regress/regress_result/<seg>.fsdb (core scope) + fsdb_run_list.txt
 python3 impl/ptpx/script/run_ptpx_parallel.py \
     --fsdb_list_file tests/regress/regress_result/fsdb_run_list.txt --clk_period 1

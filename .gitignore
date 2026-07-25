@@ -24,3 +24,10 @@ smart_run/work_par/
 # NN model artifacts (backed up to Baidu Netdisk; restore via setup_repo.sh)
 smart_run/tests/cases/model_compiled/
 hhb/model/
+
+# macOS Finder metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes

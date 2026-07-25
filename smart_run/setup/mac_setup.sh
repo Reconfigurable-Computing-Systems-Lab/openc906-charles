@@ -1,6 +1,6 @@
 # Local macOS environment for smart_run — bash/zsh replacement for
 # setup/example_setup.csh (whose /dfs/... paths exist only on the remote server).
-# Usage: source setup/local_setup.sh   (from smart_run/ or anywhere)
+# Usage: source setup/mac_setup.sh   (from smart_run/ or anywhere)
 
 _this="${BASH_SOURCE[0]:-${(%):-%x}}"
 _repo="$(cd "$(dirname "$_this")/../.." && pwd)"
