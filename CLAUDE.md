@@ -25,13 +25,6 @@ make cleansim / cleancase / clean    # remove sim products / case products / all
 
 `iverilog` (open-source) is fully supported even though `make help` only mentions vcs/nc. `DUMP=off` defines `NO_DUMP` (skip waveforms — use for regressions). Waveforms: FSDB for VCS, VCD for irun/iverilog, in `work/`.
 
-**Parallel alternative** — `smart_run/scripts/smart_runner.py` (stdlib-only Python 3):
-
-```bash
-python3 scripts/smart_runner.py runcase --case coremark [--sim vcs] [--dump on] [--timeout 1us]
-python3 scripts/smart_runner.py regress -j 4        # isolated work_regress/<case>/ dirs share one simv
-```
-
 **Test output**: result in `work/run_case.report` (PASS/FAIL + UART text), sim log `work/run.{vcs,irun,iverilog}.log`, build log `work/<CASE>_build.case.log`.
 
 **Runtime timeout**: default 3s sim time (`MAX_RUN_TIME 3_000_000_000.0` ns in tb.v); override per-run with the plusarg `+MAX_SIM_TIME=<ns>` (accepts reals, e.g. `./simv +MAX_SIM_TIME=1000000.0`).
@@ -73,7 +66,7 @@ Each test dir under `tests/cases/<category>/` is compiled with `tests/lib/crt0.s
 
 **Adding a test**: create the dir, add a `<NAME>_build` recipe in `setup/smart_cfg.mk` (copy an existing `*_build:` target), append the name to `CASE_LIST`.
 
-**NN model auto-discovery**: any `tests/cases/model_compiled/<name>/model.c` becomes a case automatically (`MODEL_CASES` glob in `smart_cfg.mk`) using the generic `NN_MODEL_BUILD` recipe — it links `tests/cases/nn_model_common/` scaffolding (`bare_main.c` entry, `sbrk.c` heap+stubs, `stubs/`) and runs `scripts/prepare_model.py` (patches `model.c` CSINN_C906→CSINN_REF, generates `test_data.h` + `input.pat`). `model_compiled/` doesn't exist in a fresh checkout — drop HHB output in and `make runcase CASE=<name>` works immediately.
+**NN model auto-discovery**: any `tests/cases/model_compiled/<name>/model.c` becomes a case automatically (`MODEL_CASES` glob in `smart_cfg.mk`) using the generic `NN_MODEL_BUILD` recipe — it links `tests/cases/nn_model_common/` scaffolding (`bare_main.c` entry, `sbrk.c` heap+stubs, `stubs/`) and runs `onnx_sim_lib/prepare_model.py` (patches `model.c` CSINN_C906→CSINN_REF, generates `test_data.h` + `input.pat`). `model_compiled/` doesn't exist in a fresh checkout — drop HHB output in and `make runcase CASE=<name>` works immediately.
 
 **Toolchain arch flags** (`CPU_ARCH_FLAG_0`, default builds use `c906fd`): `c906` = rv64imac_zifencei_xtheadc/lp64 · `c906fd` = +fd_zfh/lp64d · `c906fdv` = +v. Default `-O2`; coremark uses `-O3 -mtune=c906 -fno-optimize-sibling-calls -fno-code-hoisting`.
 

@@ -127,7 +127,7 @@ $(1)_build:
 	@cp ./tests/cases/nn_model_common/bare_main.c ./work/
 	@cp ./tests/cases/nn_model_common/sbrk.c ./work/
 	@cp -r ./tests/cases/nn_model_common/stubs ./work/stubs
-	@python3 ./scripts/prepare_model.py \
+	@python3 ./onnx_sim_lib/prepare_model.py \
 	    ./tests/cases/model_compiled/$(1) ./work
 	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
 	@cp ./tests/cases/nn_model_common/linker_model.lcf ./work/linker.lcf
@@ -143,7 +143,7 @@ $(1)_build:
 	    EXTRA_LDFLAGS="-Wl,--gc-sections -Wl,-z,muldefs \
 	        $$(CSI_NN2_INSTALL)/lib/libshl_c906_rtos.a" \
 	    >& $(1)_build.case.log
-	@python3 ./scripts/prepare_model.py \
+	@python3 ./onnx_sim_lib/prepare_model.py \
 	    ./tests/cases/model_compiled/$(1) ./work
 endef
 

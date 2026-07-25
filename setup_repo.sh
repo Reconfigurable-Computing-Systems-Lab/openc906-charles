@@ -7,7 +7,7 @@
 #   - BaiduPCS-Go on PATH (brew install baidupcs-go, or a release binary).
 #   - python3 for the netdisk helper.
 #   - A graphical session ($DISPLAY) so the login browser can open. If you
-#     are not already logged in, smart_run/scripts/baidu_netdisk.py launches
+#     are not already logged in, smart_run/onnx_sim_lib/baidu_netdisk.py launches
 #     Chrome/Chromium/Edge (or Firefox as a fallback) pointed at
 #     pan.baidu.com and runs `BaiduPCS-Go login` automatically once you log
 #     in. Use `./setup_repo.sh --login` to force a browser re-login before
@@ -38,7 +38,7 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 REMOTE_DIR="/dev_data/openc906-charles"
 TMP_DL="$REPO_ROOT/.netdisk_dl"
-NETDISK="python3 $REPO_ROOT/smart_run/scripts/baidu_netdisk.py"
+NETDISK="python3 $REPO_ROOT/smart_run/onnx_sim_lib/baidu_netdisk.py"
 
 echo "==> [1/3] Pulling csi-nn2 submodule"
 git -C "$REPO_ROOT" submodule update --init --recursive csi-nn2

@@ -20,8 +20,7 @@ verilator --binary -j 10 --threads 1 -O3 --top-module tb --timescale 1ns/1ps \
 ```
 
 Produces `work/obj_dir/simv` (self-contained, relocatable). Runs at ~130 kHz
-(≈130k core cycles / wall-second). `smart_run/scripts/smart_runner.py` also
-gained a `verilator` backend and a `--cases` filter.
+(≈130k core cycles / wall-second).
 
 Only **one** tb.v edit was needed (`ifdef VERILATOR` dump guard); every other
 risky construct (real-delay clockgen, `#(real)` timeout, `$value$plusargs("%f")`,
@@ -39,18 +38,18 @@ required for the NN path (see Bugs 1–2).
   (`CMakeLists.txt` `C906_MARCH` cache var; `__fp16`→`_Float16`, `-std=gnu17`).
 
 ### 3. ONNX → CSI-NN2 generator (replaces HHB, which is Linux-only)
-`smart_run/scripts/onnx2csinn.py` emits a bare-metal case from any node range of
+`smart_run/onnx_sim_lib/onnx2csinn.py` emits a bare-metal case from any node range of
 an ONNX graph: fp32 `CSINN_REF` graph-builder `model.c`, a `blob.bin` =
 `[params(qinfo+weights) | input | golden]`, and `model_config.h`. Weights never
 enter the ELF — the blob is loaded by the testbench into SRAM at `0x01000000`
 (the 32 MB NN window) and `csinn_()` reads through `params_base` pointers.
 Goldens are computed with onnxruntime.
 
-`smart_run/scripts/gen_segments.py` splits a model at **articulation points**
+`smart_run/onnx_sim_lib/gen_segments.py` splits a model at **articulation points**
 (node boundaries crossed by exactly one activation) into balanced, independently
 verifiable segments — every segment has one input (fed from the full-model ORT
 run) and one golden output, so segments run in parallel and together cover the
-whole network. `scripts/run_parallel_models.sh` builds them serially and runs
+whole network. `onnx_sim_lib/run_parallel_models.sh` builds them serially and runs
 all sims concurrently (one single-threaded process per core).
 
 The verification harness (`tests/cases/nn_model_common/bare_main.c`,
@@ -92,7 +91,7 @@ gated by seg08 at 394 ms sim). At 32×32 the head runs on 1×1 feature maps
 (3×3/pad-1 depthwise on 1×1, GAP over 1×1) — all 10 segments PASS (2026-07-25,
 sim times 44–394 ms, ~115 kHz effective under 10-way parallel load).
 
-Reduced-resolution variants are produced by `scripts/make_onnx_variant.py` from
+Reduced-resolution variants are produced by `onnx_sim_lib/make_onnx_variant.py` from
 the pristine 224×224 zoo model: it clears stale `value_info` (shape inference
 does **not** overwrite pre-populated entries — resizing `mbv2_64.onnx` directly
 would bake 64-based shapes into `model.c` while the blob holds new-res data),
@@ -106,12 +105,12 @@ bit-exact). It self-checks the result through onnxruntime.
 source smart_run/setup/mac_setup.sh
 cd smart_run && make compile SIM=verilator DUMP=off          # verilate once
 # make a reduced-resolution MobileNetV2 (here 32x32) + input:
-python3 scripts/make_onnx_variant.py --hw 32 --out-dir ../hhb/model/mbv2_32
+python3 onnx_sim_lib/make_onnx_variant.py --hw 32 --out-dir ../hhb/model/mbv2_32
 # cut into parallel-verifiable segments:
-python3 scripts/gen_segments.py --onnx ../hhb/model/mbv2_32/mbv2_32.onnx \
+python3 onnx_sim_lib/gen_segments.py --onnx ../hhb/model/mbv2_32/mbv2_32.onnx \
     --input-npz ../hhb/model/mbv2_32/random_input.npz --prefix mb32 \
     --out-root tests/cases/model_compiled --target-segments 12
-bash scripts/run_parallel_models.sh 8e9 mb32_seg00 mb32_seg01 ... mb32_seg09
+bash onnx_sim_lib/run_parallel_models.sh 8e9 mb32_seg00 mb32_seg01 ... mb32_seg09
 ```
 
 The 64×64 run is identical with `--hw 64` / prefix `mb64` (results preserved in
@@ -131,25 +130,21 @@ dumps its **own FSDB — there is no merge**.
   ~9.5 GB monolith). `+define+FSDB_FULL_SOC` restores full-SoC. Optional dump
   window: `+FSDB_BEGIN=<ns>` / `+FSDB_END=<ns>` (default whole run).
 - **Makefile**: `FSDB_SCOPE=core` (default) / `full` selects the scope define.
-- **`smart_runner.py regress --sim vcs --dump on`** is the idiomatic path: it
-  compiles VCS once, runs each segment in an isolated dir (symlinking
-  `simv`+`simv.daidir`), collects each dir's FSDB to
-  `tests/regress/regress_result/<case>.fsdb`, and emits `fsdb_run_list.txt`
-  (absolute paths, ready for `impl/ptpx/run_ptpx_parallel.py --fsdb_list_file`).
-  Its Python NN-build path was aligned with the Makefile `NN_MODEL_BUILD` recipe
-  (adds `-fno-optimize-sibling-calls` and the big-heap `linker_model.lcf`).
-- `run_parallel_models.sh --sim vcs <MST> <segs...>` does the same via the shell
-  runner (compile `SIM=vcs DUMP=on`, snapshot `simv`+`simv.daidir`, run with
-  `+FSDB=<case>.fsdb`), collecting `work_par/results/<case>.fsdb` + a
-  `fsdb_run_list.txt`.
+- **`onnx_sim_lib/run_parallel_models.sh --sim vcs`** is the idiomatic path: it
+  compiles VCS once (`SIM=vcs DUMP=on`), snapshots `simv`+`simv.daidir` per
+  segment, runs with `+FSDB=<case>.fsdb`, and collects
+  `work_par/results/<case>.fsdb` + `fsdb_run_list.txt` (absolute paths, ready
+  for `impl/ptpx/run_ptpx_parallel.py --fsdb_list_file`). Sequential alternative:
+  `make regress` / `make runcase CASE=<seg>`.
 
 ```
 # on a VCS/Verdi machine (same generated case dirs as the Verilator run):
 source smart_run/setup/example_setup.csh   # server csh setup, edited paths
 cd smart_run
-python3 scripts/smart_runner.py regress --sim vcs --dump on -j 8 \
-    --cases mb32_seg00,mb32_seg01,...,mb32_seg09
-# -> tests/regress/regress_result/<seg>.fsdb (core scope) + fsdb_run_list.txt
+bash onnx_sim_lib/run_parallel_models.sh --sim vcs 8e9 \
+    mb32_seg00 mb32_seg01 mb32_seg02 mb32_seg03 mb32_seg04 \
+    mb32_seg05 mb32_seg06 mb32_seg07 mb32_seg08 mb32_seg09
+# -> work_par/results/<seg>.fsdb (core scope) + fsdb_run_list.txt
 python3 impl/ptpx/script/run_ptpx_parallel.py \
-    --fsdb_list_file tests/regress/regress_result/fsdb_run_list.txt --clk_period 1
+    --fsdb_list_file work_par/results/fsdb_run_list.txt --clk_period 1
 ```
