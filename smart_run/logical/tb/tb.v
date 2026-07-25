@@ -118,8 +118,17 @@ integer i;
     $display("\t********* Read program *********");
     $readmemh("inst.pat", mem_inst_temp);
     $readmemh("data.pat", mem_data_temp);
+`ifdef VERILATOR
+    // NOTE: an over-length $readmemh is fatal here, and mem_input_temp (16384
+    // words) is only the legacy 0x80000 window. Load the large NN array (8M
+    // words) and mirror its head into the legacy window so both input windows
+    // are populated without overrunning the small array.
+    $readmemh("input.pat", mem_nn_input_temp);
+    for (i=0; i<16384; i=i+1) mem_input_temp[i] = mem_nn_input_temp[i];
+`else
     $readmemh("input.pat", mem_input_temp);
     $readmemh("input.pat", mem_nn_input_temp);
+`endif
   
     $display("\t********* Load program to memory *********");
     i=0;
@@ -247,7 +256,11 @@ $finish;
 end
 
 reg [31:0] retire_inst_in_period;
-reg [31:0] cycle_count;
+// Initialized at declaration: under 2-state simulators (Verilator) an
+// uninitialized count reads 0 before reset, so (count % LAST_CYCLE)==0 would
+// trip the watchdog on the very first clock edge. 4-state simulators mask
+// this because X % N != 0.
+reg [31:0] cycle_count = 32'h1;
 
 `define LAST_CYCLE 50000
 always @(posedge clk or negedge rst_b)
@@ -361,17 +374,44 @@ end
 `ifndef NO_DUMP
 initial
 begin
-`ifdef NC_SIM
+`ifdef VERILATOR
   $dumpfile("test.vcd");
-  $dumpvars;  
+  $dumpvars;
 `else
-   `ifdef IVERILOG_SIM
-     $dumpfile("test.vcd");
-     $dumpvars;  
-   `else
-     $display("######time:%d, Dump start######",$time);
-     $fsdbDumpvars();
-   `endif
+ `ifdef NC_SIM
+   $dumpfile("test.vcd");
+   $dumpvars;
+ `else
+    `ifdef IVERILOG_SIM
+      $dumpfile("test.vcd");
+      $dumpvars;
+    `else
+      // VCS / Verdi FSDB. Scope defaults to the core (`CPU_TOP) to keep files
+      // tractable and to match the PTPX read_fsdb -strip_path / GLS SDF region;
+      // pass +define+FSDB_FULL_SOC to dump the whole SoC (old behavior).
+      // Filename via +FSDB=<file> (default novas.fsdb). Optional dump window via
+      // +FSDB_BEGIN=<ns> / +FSDB_END=<ns> (reals); default = whole run.
+      begin : fsdb_dump_blk
+        reg [1023:0] fsdb_file;
+        real fsdb_begin, fsdb_end;
+        if (!$value$plusargs("FSDB=%s", fsdb_file))
+          fsdb_file = "novas.fsdb";
+        $fsdbDumpfile(fsdb_file);
+        $display("######time:%0t, FSDB dump start (%0s) ######", $time, fsdb_file);
+      `ifdef FSDB_FULL_SOC
+        $fsdbDumpvars();
+      `else
+        $fsdbDumpvars(0, `CPU_TOP);
+      `endif
+        if ($value$plusargs("FSDB_BEGIN=%f", fsdb_begin)) begin
+          $fsdbDumpoff;
+          #(fsdb_begin) $fsdbDumpon;
+          if ($value$plusargs("FSDB_END=%f", fsdb_end))
+            #(fsdb_end - fsdb_begin) $fsdbDumpoff;
+        end
+      end
+    `endif
+ `endif
 `endif
 end
 `endif

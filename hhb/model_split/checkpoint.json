@@ -1,0 +1,32 @@
+{
+  "models": {
+    "mobilenetv2_100_Opset17_timm/mobilenetv2_100_Opset17_timm.onnx": {
+      "max_weight_bytes": 524288,
+      "message": "cannot build carried outputs for nodes 152-152; missing tensors: /blocks/blocks.5/blocks.5.1/Add_output_0",
+      "part_count": 0,
+      "source_input_npz": {
+        "mtime_ns": 1784910329453436139,
+        "path": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model/mobilenetv2_100_Opset17_timm/random_input.npz",
+        "size": 602368
+      },
+      "source_onnx": {
+        "mtime_ns": 1784910327498796393,
+        "path": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model/mobilenetv2_100_Opset17_timm/mobilenetv2_100_Opset17_timm.onnx",
+        "size": 13989578
+      },
+      "status": "failed",
+      "total_weight_bytes": 0,
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/split_onnx_models.py\", line 500, in process_job\n    parts = analyzer.build_part_plans(ranges)\n  File \"/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/split_onnx_models.py\", line 252, in build_part_plans\n    raise SplitterError(\n    ...<2 lines>...\n    )\nSplitterError: cannot build carried outputs for nodes 152-152; missing tensors: /blocks/blocks.5/blocks.5.1/Add_output_0\n",
+      "updated_at": "2026-07-24T16:37:29Z"
+    }
+  },
+  "settings": {
+    "creates_chained_input_npz": true,
+    "max_weight_bytes": 524288,
+    "model_root": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model",
+    "output_root": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model_split",
+    "verifies_against_original_model": true
+  },
+  "updated_at": "2026-07-24T16:37:29Z",
+  "version": 1
+}

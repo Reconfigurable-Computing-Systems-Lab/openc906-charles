@@ -26,9 +26,9 @@ limitations under the License.
 	.global	__start
 __start:
 
-# enable extension
+# enable extension (0x7c0 = mxstatus; numeric so upstream binutils accepts it)
   li   x3, 0x400000
-  csrs mxstatus,x3
+  csrs 0x7c0,x3
 
 # enable fpu
   li   x3, 0x802000

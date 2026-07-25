@@ -1,13 +1,23 @@
 /* _sbrk implementation for bare-metal newlib heap support.
- * Heap grows from 'end' (linker-defined end of BSS) toward the stack. */
+ *
+ * When the linker script defines a dedicated high-SRAM heap window
+ * (__heap_start/__heap_end, see linker_model.lcf) the heap lives there — needed
+ * for CSI-NN2 model activations that far exceed the ~700 KB between 'end' and
+ * the stack. Otherwise it falls back to growing from 'end' (legacy behavior).
+ */
 extern char end[];
+extern char __heap_start __attribute__((weak));
+extern char __heap_end __attribute__((weak));
 
 static char *heap_ptr = 0;
 
 void *_sbrk(int incr)
 {
     if (heap_ptr == 0)
-        heap_ptr = end;
+        heap_ptr = (&__heap_start != 0) ? &__heap_start : end;
+    char *limit = (&__heap_end != 0) ? &__heap_end : (char *)0xee000;
+    if (heap_ptr + incr > limit)
+        return (void *)-1;          /* ENOMEM */
     char *prev = heap_ptr;
     heap_ptr += incr;
     return prev;

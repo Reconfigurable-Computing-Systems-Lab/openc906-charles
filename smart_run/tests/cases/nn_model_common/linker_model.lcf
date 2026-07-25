@@ -1,0 +1,44 @@
+/* Linker script for CSI-NN2 model cases (copied over work/linker.lcf by the
+ * NN_MODEL_BUILD recipe). Same code/data regions as tests/lib/linker.lcf, plus
+ * a large heap window high in the 256 MB SRAM for CSI-NN2 activations
+ * (graph_ref keeps intermediate tensors live; MobileNetV2 needs ~20-30 MB).
+ * The weight/input/golden blob lives at 0x01000000..~0x03000000 (loaded by the
+ * testbench from input.pat), so the heap starts safely above it at 0x04000000.
+ * The default tests/lib/linker.lcf is untouched (ISA/coremark unaffected).
+ */
+MEMORY
+{
+MEM1(RWX)  : ORIGIN = 0x00000000,  LENGTH = 0x40000
+MEM2(RWX)  : ORIGIN = 0x00040000,  LENGTH = 0xc0000
+}
+__kernel_stack = 0xee000 ;
+__heap_start   = 0x04000000 ;
+__heap_end     = 0x0f000000 ;
+
+ENTRY(__start)
+
+SECTIONS {
+    .text :
+    {
+        crt0.o (.text)
+        *(.text*)
+    } >MEM1
+
+    .rodata :  {   *( .rodata* )
+                   *(.srodata)
+                   *(.srodata.*)
+                   *(.srodata.cst4*)
+		   *(.srodata.cst8*)
+		  } >MEM1
+
+    .data :
+    {
+        *(.data*)
+        *(.sdata*)
+    } >MEM2
+    .bss :
+    {
+        *(.bss) *.(COMMON) *(.sbss)
+    } >MEM2
+    end = .;
+}

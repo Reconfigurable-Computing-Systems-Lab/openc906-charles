@@ -1,0 +1,25 @@
+{
+  "dry_run": [],
+  "dry_run_count": 0,
+  "failed": [
+    {
+      "error": "cannot build carried outputs for nodes 152-152; missing tensors: /blocks/blocks.5/blocks.5.1/Add_output_0",
+      "model": "mobilenetv2_100_Opset17_timm",
+      "parts": 0
+    }
+  ],
+  "failed_count": 1,
+  "finished_at": "2026-07-24T16:37:29Z",
+  "inference_backend": "onnxruntime",
+  "max_weight_bytes": 524288,
+  "mode": "execute",
+  "model_root": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model",
+  "models_total": 1,
+  "output_root": "/Users/jingbo.jiang/Documents/GitHub/openc906-charles/hhb/model_split",
+  "passed": [],
+  "passed_count": 0,
+  "skipped": [],
+  "skipped_count": 0,
+  "started_at": "2026-07-24T16:37:29Z",
+  "total_parts": 0
+}

@@ -7,6 +7,7 @@ import dataclasses
 import json
 import math
 import shutil
+import sys
 import tempfile
 import time
 import traceback
@@ -178,13 +179,22 @@ class GraphAnalyzer:
 
         split_end = self.find_max_prefix_under_limit(start, end, limit_bytes)
         if split_end is None or split_end < start:
+            # A single node's weights exceed the limit. When weights are delivered
+            # out-of-band (e.g. loaded into SRAM rather than baked into the ELF),
+            # the limit is only a parallelism/granularity knob, so put this node in
+            # its own part instead of failing.
             node = self.nodes[start]
             node_name = node.name or f"node_{start}"
             node_weight = self.range_weight_bytes(start, start)
-            raise UnsplittableModelError(
-                f"{node_name} at index {start} needs {format_bytes(node_weight)} of weights, "
-                f"which is above the limit {format_bytes(limit_bytes)}"
+            sys.stderr.write(
+                f"warning: {node_name} at index {start} needs {format_bytes(node_weight)} "
+                f"of weights, above the limit {format_bytes(limit_bytes)}; "
+                f"emitting it as its own part\n"
             )
+            left = [RangeSlice(start=start, end=start, weight_bytes=node_weight)]
+            if start >= end:
+                return left
+            return left + self._split_range(start + 1, end, limit_bytes)
 
         left = [RangeSlice(start=start, end=split_end, weight_bytes=self.range_weight_bytes(start, split_end))]
         if split_end >= end:
@@ -549,7 +559,8 @@ def process_job(
                         f"{part_output_names} != {part.output_names}"
                     )
                 actual_weight_bytes = GraphAnalyzer(part_model).total_weight_bytes
-                if actual_weight_bytes > max_weight_bytes:
+                if actual_weight_bytes > max_weight_bytes and part.start != part.end:
+                    # Single-node parts are allowed to exceed the limit (see _split_range).
                     raise SplitterError(
                         f"{job.name} part {part.index}: actual weight {format_bytes(actual_weight_bytes)} "
                         f"still exceeds limit {format_bytes(max_weight_bytes)}"

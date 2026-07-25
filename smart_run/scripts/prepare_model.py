@@ -71,19 +71,29 @@ def find_input_bins(model_dir):
     return bins
 
 
+def _bytes_to_pat(data, fh):
+    """Emit a byte image as testbench .pat words.
+
+    The tb.v $readmemh loaders / SRAM byte lanes place the LEFTMOST hex pair of
+    each line at the LOWEST byte address (verified via inst.pat: code executes),
+    so a word is packed big-endian over the ascending-address bytes. A CPU
+    little-endian load then reconstructs the original value. (The old code used
+    "<I", which byte-reversed every 32-bit value in SRAM.)
+    """
+    pad = (4 - len(data) % 4) % 4
+    data += b"\x00" * pad
+    for i in range(0, len(data), 4):
+        word = struct.unpack(">I", data[i : i + 4])[0]
+        fh.write(f"{word:08x}\n")
+
+
 def generate_input_pat(bins, output_dir):
     """Concatenate input .bin files and write as Verilog hex words."""
     dst = os.path.join(output_dir, "input.pat")
     with open(dst, "w") as f:
         for _, bin_path in bins:
             with open(bin_path, "rb") as bf:
-                data = bf.read()
-            # Pad to 4-byte alignment
-            pad = (4 - len(data) % 4) % 4
-            data += b"\x00" * pad
-            for i in range(0, len(data), 4):
-                word = struct.unpack("<I", data[i : i + 4])[0]
-                f.write(f"{word:08x}\n")
+                _bytes_to_pat(bytearray(bf.read()), f)
 
 
 def generate_model_config_h(output_dir, total_bytes, num_inputs):
@@ -99,6 +109,30 @@ def generate_model_config_h(output_dir, total_bytes, num_inputs):
         f.write("#endif /* MODEL_CONFIG_H */\n")
 
 
+def passthrough(model_dir, output_dir):
+    """Generator-produced case (marker file GENERATED present).
+
+    model.c and model_config.h are already final; the single blob.bin
+    (params|input|golden) becomes input.pat. A stub test_data.h satisfies the
+    #include in bare_main.c (model_params[] is unused in PARAMS_IN_SRAM mode).
+    """
+    import shutil
+    shutil.copy(os.path.join(model_dir, "model.c"),
+                os.path.join(output_dir, "model.c"))
+    shutil.copy(os.path.join(model_dir, "model_config.h"),
+                os.path.join(output_dir, "model_config.h"))
+    with open(os.path.join(output_dir, "test_data.h"), "w") as f:
+        f.write("#ifndef TEST_DATA_H\n#define TEST_DATA_H\n"
+                "static const unsigned char model_params[1] = {0};\n"
+                "#endif\n")
+    with open(os.path.join(model_dir, "blob.bin"), "rb") as bf:
+        blob = bytearray(bf.read())
+    with open(os.path.join(output_dir, "input.pat"), "w") as f:
+        _bytes_to_pat(blob, f)
+    print(f"  [prepare_model] passthrough {os.path.basename(model_dir)}: "
+          f"blob {len(blob)} bytes -> input.pat")
+
+
 def main():
     if len(sys.argv) != 3:
         print(f"Usage: {sys.argv[0]} <model_dir> <output_dir>", file=sys.stderr)
@@ -106,6 +140,10 @@ def main():
 
     model_dir = sys.argv[1]
     output_dir = sys.argv[2]
+
+    if os.path.exists(os.path.join(model_dir, "GENERATED")):
+        passthrough(model_dir, output_dir)
+        return
 
     # 1. Patch model.c
     patch_model_c(model_dir, output_dir)

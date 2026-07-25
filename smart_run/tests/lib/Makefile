@@ -19,7 +19,9 @@ AS      = ${TOOL_EXTENSION}/riscv64-unknown-elf-as
 LINK    = ${TOOL_EXTENSION}/riscv64-unknown-elf-ld
 OBJDUMP = ${TOOL_EXTENSION}/riscv64-unknown-elf-objdump
 OBJCOPY = ${TOOL_EXTENSION}/riscv64-unknown-elf-objcopy
-CONVERT		=../tests/bin/Srec2vmem
+# Overridable: on macOS the prebuilt Srec2vmem (Linux x86-64 ELF) cannot run;
+# export CONVERT="python3 .../tests/bin/srec2vmem.py" (see setup/local_setup.sh)
+CONVERT		?=../tests/bin/Srec2vmem
 
 SSRC = $(wildcard *.S)
 sSRC = $(wildcard *.s)
@@ -29,8 +31,29 @@ OBJECTS = $(SSRC:%.S=%.o) $(sSRC:%.s=%.o) $(CSRC:%.c=%.o)
 
 #INCDIR = -I/tools/cskytools/csky-abiv2-elf-tools-x86_64-20130312/csky-abiv2-elf/include -I.
 
-FLAG_ABI = 
-FLAG_MARCH = -mtune=c906 
+# THEAD_GCC=1 (default): Xuantie GCC with xtheadc meta-extension + custom passes.
+# THEAD_GCC=0: portable flags for upstream/xPack GCC (no xtheadc, no Xuantie-only
+# options); used for local macOS builds (see setup/local_setup.sh).
+THEAD_GCC ?= 1
+COREMARK_ITER ?= 10000
+
+FLAG_ABI =
+ifeq (${THEAD_GCC}, 0)
+#CPU_ARCH_FLAG_0 => CPU Arch: c906, c906fd, c906fdv
+ifeq (${CPU_ARCH_FLAG_0}, c906)
+  FLAG_MARCH = -march=rv64imac_zicsr_zifencei -mtune=thead-c906
+  FLAG_ABI   = -mabi=lp64
+else
+  ifeq (${CPU_ARCH_FLAG_0}, c906fd)
+    FLAG_MARCH = -march=rv64imafdc_zfh_zicsr_zifencei -mtune=thead-c906
+    FLAG_ABI   = -mabi=lp64d
+  else  # c906fdv
+    FLAG_MARCH = -march=rv64imafdcv_zfh_zicsr_zifencei -mtune=thead-c906
+    FLAG_ABI   = -mabi=lp64d
+  endif
+endif
+else
+FLAG_MARCH = -mtune=c906
 #CPU_ARCH_FLAG_0 => CPU Arch: c906, c906fd, c906fdv
 ifeq (${CPU_ARCH_FLAG_0}, c906)
   FLAG_MARCH += -march=rv64imac_zifencei_xtheadc
@@ -44,10 +67,15 @@ else
     FLAG_ABI   = -mabi=lp64d
   endif
 endif
-CFLAGS = ${FLAG_MARCH} ${FLAG_ABI} 
+endif
+CFLAGS = ${FLAG_MARCH} ${FLAG_ABI}
 
 ifeq (${CASENAME}, coremark)
-  CFLAGS +=  -c -O3 -mtune=c906 -static -funroll-all-loops -finline-limit=500 -fgcse-sm -fno-schedule-insns --param max-rtl-if-conversion-unpredictable-cost=100 -msignedness-cmpiv -fno-code-hoisting -mno-thread-jumps1 -mno-iv-adjust-addr-cost -mno-expand-split-imm -DITERATIONS=10000 -Wno-error=implicit-function-declaration
+  ifeq (${THEAD_GCC}, 0)
+    CFLAGS +=  -c -O3 -static -funroll-all-loops -finline-limit=500 -fgcse-sm -fno-schedule-insns --param max-rtl-if-conversion-unpredictable-cost=100 -fno-code-hoisting -DITERATIONS=${COREMARK_ITER} -Wno-error=implicit-function-declaration
+  else
+    CFLAGS +=  -c -O3 -mtune=c906 -static -funroll-all-loops -finline-limit=500 -fgcse-sm -fno-schedule-insns --param max-rtl-if-conversion-unpredictable-cost=100 -msignedness-cmpiv -fno-code-hoisting -mno-thread-jumps1 -mno-iv-adjust-addr-cost -mno-expand-split-imm -DITERATIONS=${COREMARK_ITER} -Wno-error=implicit-function-declaration
+  endif
 else
   CFLAGS += -c -O2
 endif

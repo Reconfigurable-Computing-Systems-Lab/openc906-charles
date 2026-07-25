@@ -130,10 +130,12 @@ $(1)_build:
 	@python3 ./scripts/prepare_model.py \
 	    ./tests/cases/model_compiled/$(1) ./work
 	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cp ./tests/cases/nn_model_common/linker_model.lcf ./work/linker.lcf
 	@cd ./work && make -s clean && make -s all \
 	    CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian \
 	    CASENAME=$(1) FILE=bare_main \
 	    EXTRA_CFLAGS="-DSHL_BUILD_RTOS -isystem stubs \
+	        -fno-optimize-sibling-calls $(PROBE_CFLAGS) \
 	        -I$$(CSI_NN2_INSTALL)/include \
 	        -I$$(CSI_NN2_INSTALL)/include/csinn \
 	        -I$$(CSI_NN2_INSTALL)/include/shl_public \

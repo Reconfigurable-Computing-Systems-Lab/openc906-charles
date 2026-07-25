@@ -1,0 +1,21 @@
+[2026-07-25 00:34:07] Starting run for 1 model(s) with max_weight=640.00 KB resume=on
+[2026-07-25 00:34:07] Inference backend: onnxruntime
+[2026-07-25 00:34:07] [1/1] Processing mobilenetv2_100_Opset17_timm
+[2026-07-25 00:34:07] mobilenetv2_100_Opset17_timm: FAILED /blocks/blocks.6/blocks.6.0/conv_pwl/Conv at index 162 needs 1.17 MB of weights, which is above the limit 640.00 KB
+[2026-07-25 00:34:07] SUMMARY models=1 passed=0 failed=1 skipped=0 dry_run=0 total_parts=0
+[2026-07-25 00:34:07] FAIL LIST
+[2026-07-25 00:34:07]   FAIL mobilenetv2_100_Opset17_timm parts=0 reason=/blocks/blocks.6/blocks.6.0/conv_pwl/Conv at index 162 needs 1.17 MB of weights, which is above the limit 640.00 KB
+[2026-07-25 00:37:12] Starting run for 1 model(s) with max_weight=512.00 KB resume=on
+[2026-07-25 00:37:12] Inference backend: onnxruntime
+[2026-07-25 00:37:12] [1/1] Processing mobilenetv2_100_Opset17_timm
+[2026-07-25 00:37:12] mobilenetv2_100_Opset17_timm: FAILED name 'sys' is not defined
+[2026-07-25 00:37:12] SUMMARY models=1 passed=0 failed=1 skipped=0 dry_run=0 total_parts=0
+[2026-07-25 00:37:12] FAIL LIST
+[2026-07-25 00:37:12]   FAIL mobilenetv2_100_Opset17_timm parts=0 reason=name 'sys' is not defined
+[2026-07-25 00:37:29] Starting run for 1 model(s) with max_weight=512.00 KB resume=on
+[2026-07-25 00:37:29] Inference backend: onnxruntime
+[2026-07-25 00:37:29] [1/1] Processing mobilenetv2_100_Opset17_timm
+[2026-07-25 00:37:29] mobilenetv2_100_Opset17_timm: FAILED cannot build carried outputs for nodes 152-152; missing tensors: /blocks/blocks.5/blocks.5.1/Add_output_0
+[2026-07-25 00:37:29] SUMMARY models=1 passed=0 failed=1 skipped=0 dry_run=0 total_parts=0
+[2026-07-25 00:37:29] FAIL LIST
+[2026-07-25 00:37:29]   FAIL mobilenetv2_100_Opset17_timm parts=0 reason=cannot build carried outputs for nodes 152-152; missing tensors: /blocks/blocks.5/blocks.5.1/Add_output_0

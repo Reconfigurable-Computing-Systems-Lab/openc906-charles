@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "datatype.h"
 #include "stdio.h"
+#include <stdint.h>
 
 //#define FAPB    10000000L
 #define BAUD    19200L

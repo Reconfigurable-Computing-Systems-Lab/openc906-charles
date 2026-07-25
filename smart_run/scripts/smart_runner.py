@@ -8,13 +8,16 @@ Usage (run from smart_run/ directory):
     python3 scripts/smart_runner.py compile  [--sim vcs] [--dump on]
     python3 scripts/smart_runner.py buildcase --case CASE
     python3 scripts/smart_runner.py runcase  --case CASE [--sim vcs] [--dump on] [--timeout 1us]
-    python3 scripts/smart_runner.py regress  [--sim vcs] [--dump on] [-j 4] [--timeout 1us]
+    python3 scripts/smart_runner.py regress  [--sim vcs] [--dump on] [-j 4] [--timeout 1us] [--cases a,b,c]
     python3 scripts/smart_runner.py clean
+
+Supported simulators (--sim): vcs / nc / iverilog / verilator
 """
 
 import argparse
 import glob
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -256,6 +259,22 @@ def get_sim_config(sim, dump, case=None):
             f"-f {code_base}/gen_rtl/filelists/tdt_dmi_top_rtl.fl "
             "-c ../logical/filelists/smart.fl -c ../logical/filelists/tb.fl"
         )
+    elif sim == "verilator":
+        timescale = "--timescale 1ns/1ps"
+        sim_opt = (
+            "--binary -j 10 --threads 1 -O3 --top-module tb "
+            "-Wno-fatal -Wno-TIMESCALEMOD -Wno-IMPLICIT -Wno-WIDTH -Wno-UNOPTFLAT "
+            "--x-assign fast --x-initial fast -o simv"
+        )
+        if dump == "on":
+            sim_opt += " --trace-vcd"
+        sim_def = ""
+        sim_log = ""
+        filelist = (
+            f"-f {code_base}/gen_rtl/filelists/C906_asic_rtl.fl "
+            f"-f {code_base}/gen_rtl/filelists/tdt_dmi_top_rtl.fl "
+            "-f ../logical/filelists/smart.fl -f ../logical/filelists/tb.fl"
+        )
     else:
         print(f"ERROR: Unknown simulator '{sim}'", file=sys.stderr)
         sys.exit(1)
@@ -295,6 +314,14 @@ def compile_rtl(sim, dump, work_dir, case=None):
             elif os.path.isfile(path):
                 os.remove(path)
 
+    # Clean old simulator artifacts for Verilator (stale binary would mask a
+    # failed re-compile since `tee` swallows the compiler's exit code)
+    if sim == "verilator":
+        for item in ("simv", os.path.join("obj_dir", "simv")):
+            path = os.path.join(work_dir, item)
+            if os.path.islink(path) or os.path.isfile(path):
+                os.remove(path)
+
     if sim == "vcs":
         cmd = (
             f"vcs {cfg['sim_opt']} {cfg['timescale']} {cfg['sim_def']} "
@@ -310,11 +337,32 @@ def compile_rtl(sim, dump, work_dir, case=None):
             f"iverilog {cfg['timescale']} {cfg['sim_opt']} {cfg['sim_def']} "
             f"{cfg['filelist']} {cfg['sim_dump']} {cfg['sim_log']}"
         )
+    elif sim == "verilator":
+        cmd = (
+            f"verilator {cfg['sim_opt']} {cfg['timescale']} {cfg['sim_def']} "
+            f"{cfg['filelist']} {cfg['sim_dump']} 2>&1 | tee comp.verilator.log"
+        )
 
     rc, _ = run_cmd(cmd, cwd=work_dir)
     if rc != 0:
         print(f"  [smart_runner] RTL compilation FAILED (rc={rc})", file=sys.stderr)
         return False
+
+    # Verilator: `tee` masks the compiler's exit code, so verify the binary
+    # exists, then link work/simv -> obj_dir/simv (like `ln -sf obj_dir/simv simv`)
+    if sim == "verilator":
+        binary = os.path.join(work_dir, "obj_dir", "simv")
+        if not os.path.isfile(binary):
+            print(
+                "  [smart_runner] RTL compilation FAILED (obj_dir/simv not produced)",
+                file=sys.stderr,
+            )
+            return False
+        link = os.path.join(work_dir, "simv")
+        if os.path.islink(link) or os.path.exists(link):
+            os.remove(link)
+        os.symlink(os.path.join("obj_dir", "simv"), link)
+
     print("  [smart_runner] RTL compilation OK")
     return True
 
@@ -331,6 +379,17 @@ def copy_lib_files(base_dir, work_dir):
         src = os.path.join(lib_dir, f)
         if os.path.isfile(src):
             shutil.copy2(src, work_dir)
+
+
+def get_convert_cmd(base_dir):
+    """Return the SREC-to-vmem converter command (CONVERT for the case Makefile).
+
+    The prebuilt Srec2vmem binary is Linux-only; on macOS use the Python port.
+    """
+    if platform.system() == "Darwin":
+        script = os.path.abspath(os.path.join(base_dir, "tests", "bin", "srec2vmem.py"))
+        return f"python3 {script}"
+    return os.path.abspath(os.path.join(base_dir, "tests", "bin", "Srec2vmem"))
 
 
 def build_standard_case(case_name, case_info, base_dir, work_dir):
@@ -361,8 +420,8 @@ def build_standard_case(case_name, case_info, base_dir, work_dir):
     # Copy lib files
     copy_lib_files(base_dir, work_dir)
 
-    # Compute absolute CONVERT path for Srec2vmem
-    convert_path = os.path.abspath(os.path.join(base_dir, "tests", "bin", "Srec2vmem"))
+    # Compute absolute CONVERT command for Srec2vmem
+    convert_path = get_convert_cmd(base_dir)
 
     # Build
     log_file = os.path.join(work_dir, f"{case_name}_build.case.log")
@@ -370,7 +429,7 @@ def build_standard_case(case_name, case_info, base_dir, work_dir):
         f"make -s clean && make -s all "
         f"CPU_ARCH_FLAG_0={DEFAULT_CPU_ARCH} ENDIAN_MODE={DEFAULT_ENDIAN} "
         f"CASENAME={case_name} FILE={file_name} "
-        f"CONVERT={convert_path}"
+        f'CONVERT="{convert_path}"'
     )
     rc, _ = run_cmd(cmd, cwd=work_dir, log_file=log_file)
     return rc == 0
@@ -392,7 +451,7 @@ def build_conv_softmax(base_dir, work_dir):
     # Copy lib files
     copy_lib_files(base_dir, work_dir)
 
-    convert_path = os.path.abspath(os.path.join(base_dir, "tests", "bin", "Srec2vmem"))
+    convert_path = get_convert_cmd(base_dir)
 
     extra_cflags = (
         "-DSHL_BUILD_RTOS -isystem stubs "
@@ -413,7 +472,7 @@ def build_conv_softmax(base_dir, work_dir):
         f'CASENAME=conv_softmax FILE=bare_main '
         f'EXTRA_CFLAGS="{extra_cflags}" '
         f'EXTRA_LDFLAGS="{extra_ldflags}" '
-        f"CONVERT={convert_path}"
+        f'CONVERT="{convert_path}"'
     )
     rc, _ = run_cmd(cmd, cwd=work_dir, log_file=log_file)
     if rc != 0:
@@ -450,13 +509,19 @@ def build_nn_model_case(case_name, case_info, base_dir, work_dir):
         print(f"  [smart_runner] prepare_model.py failed for {case_name}", file=sys.stderr)
         return False
 
-    # Copy lib files
+    # Copy lib files, then override the linker script with the model variant
+    # (big heap in high SRAM for CSI-NN2 activations). Must match the Makefile
+    # NN_MODEL_BUILD path.
     copy_lib_files(base_dir, work_dir)
+    shutil.copy2(os.path.join(common_dir, "linker_model.lcf"),
+                 os.path.join(work_dir, "linker.lcf"))
 
-    convert_path = os.path.abspath(os.path.join(base_dir, "tests", "bin", "Srec2vmem"))
+    convert_path = get_convert_cmd(base_dir)
 
+    # -fno-optimize-sibling-calls is REQUIRED: jr-based tail calls through BSS
+    # function-pointer tables hang C906 retirement in RTL sim (watchdog FAIL).
     extra_cflags = (
-        "-DSHL_BUILD_RTOS -isystem stubs "
+        "-DSHL_BUILD_RTOS -isystem stubs -fno-optimize-sibling-calls "
         f"-I{csi_install}/include "
         f"-I{csi_install}/include/csinn "
         f"-I{csi_install}/include/shl_public "
@@ -474,7 +539,7 @@ def build_nn_model_case(case_name, case_info, base_dir, work_dir):
         f"CASENAME={case_name} FILE=bare_main "
         f'EXTRA_CFLAGS="{extra_cflags}" '
         f'EXTRA_LDFLAGS="{extra_ldflags}" '
-        f"CONVERT={convert_path}"
+        f'CONVERT="{convert_path}"'
     )
     rc, _ = run_cmd(cmd, cwd=work_dir, log_file=log_file)
     if rc != 0:
@@ -564,6 +629,8 @@ def get_sim_run_cmd(sim, timeout_ns=None):
         return f"irun -R{plusarg} -l run.irun.log"
     elif sim == "iverilog":
         return f"vvp xuantie_core.vvp{plusarg} -l run.iverilog.log"
+    elif sim == "verilator":
+        return f"./simv{plusarg} 2>&1 | tee run.verilator.log"
     else:
         return f"./simv{plusarg} -l run.vcs.log"
 
@@ -590,7 +657,7 @@ def get_waveform_files(sim, work_dir):
     """Return list of (src_path, dst_extension) for waveform files in work_dir.
 
     VCS produces novas.fsdb (and possibly *.fsdb).
-    NC/iverilog produce test.vcd.
+    NC/iverilog/verilator produce test.vcd.
     """
     results = []
     if sim == "vcs":
@@ -598,7 +665,7 @@ def get_waveform_files(sim, work_dir):
         for fname in os.listdir(work_dir):
             if fname.endswith(".fsdb"):
                 results.append((os.path.join(work_dir, fname), ".fsdb"))
-    elif sim in ("nc", "iverilog"):
+    elif sim in ("nc", "iverilog", "verilator"):
         vcd = os.path.join(work_dir, "test.vcd")
         if os.path.isfile(vcd):
             results.append((vcd, ".vcd"))
@@ -626,6 +693,10 @@ def setup_case_work_dir(sim, case_name, shared_work_dir, regress_base):
         items = ["INCA_libs"]
     elif sim == "iverilog":
         items = ["xuantie_core.vvp"]
+    elif sim == "verilator":
+        # work/simv is itself a relative symlink to obj_dir/simv; symlinking
+        # its abspath is fine — the chain resolves through work/ correctly.
+        items = ["simv"]
     else:
         items = ["simv", "simv.daidir"]
 
@@ -804,9 +875,28 @@ def cmd_regress(args):
     dump = args.dump
 
     case_list = sorted(cases.keys())
+
+    # Optional case filter (--cases a,b,c)
+    if getattr(args, "cases", None):
+        selected = [c.strip() for c in args.cases.split(",") if c.strip()]
+        unknown = [c for c in selected if c not in cases]
+        if unknown:
+            print(f"ERROR: Unknown case(s): {', '.join(unknown)}.", file=sys.stderr)
+            print(
+                "  Run 'python3 scripts/smart_runner.py showcase' for valid cases.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        case_list = sorted(set(selected))
+
     print(f"  [smart_runner] Regression: {len(case_list)} cases, {jobs} parallel job(s)")
     if timeout_ns is not None:
         print(f"  [smart_runner] Timeout: {args.timeout} ({timeout_ns:.3f} ns)")
+    if sim == "verilator" and jobs > 8:
+        print(
+            f"  [smart_runner] WARNING: -j {jobs} with verilator may be tight on "
+            "memory (each simv RSS ~0.4 GB)."
+        )
 
     # Setup result directory
     regress_result_dir = os.path.join(".", "tests", "regress", "regress_result")
@@ -929,6 +1019,23 @@ def cmd_regress(args):
                 with open(report_dst, "w") as f:
                     f.write(f"TEST FAIL (exception: {e})\n")
 
+    # For VCS, emit a fsdb_run_list.txt of the collected per-case FSDBs, ready
+    # for the PrimePower flow (impl/ptpx/run_ptpx_parallel.py --fsdb_list_file).
+    # Each segment's FSDB is independent — no merge.
+    if sim == "vcs":
+        fsdb_paths = sorted(
+            os.path.abspath(os.path.join(regress_result_dir, f))
+            for f in os.listdir(regress_result_dir)
+            if f.endswith(".fsdb")
+        )
+        if fsdb_paths:
+            list_path = os.path.join(regress_result_dir, "fsdb_run_list.txt")
+            with open(list_path, "w") as f:
+                f.write("# per-segment FSDBs (core scope); feed to run_ptpx_parallel.py\n")
+                for p in fsdb_paths:
+                    f.write(p + "\n")
+            print(f"  [smart_runner] Wrote {list_path} ({len(fsdb_paths)} FSDBs)")
+
     # Phase 3: Generate report
     print(f"\n  [smart_runner] === Phase 3: Generate Report ===")
     report_file = generate_report(results, regress_result_dir)
@@ -987,8 +1094,10 @@ def main():
             "Examples:\n"
             "  python3 scripts/smart_runner.py showcase\n"
             "  python3 scripts/smart_runner.py runcase --case ISA_INT --sim vcs\n"
+            "  python3 scripts/smart_runner.py runcase --case coremark --sim verilator --dump off\n"
             "  python3 scripts/smart_runner.py regress --sim vcs -j 4 --timeout 1us\n"
             "  python3 scripts/smart_runner.py regress --sim vcs -j 8 --timeout 3s\n"
+            "  python3 scripts/smart_runner.py regress --sim verilator -j 4 --cases ISA_INT,coremark\n"
         ),
     )
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
@@ -999,7 +1108,7 @@ def main():
 
     # compile
     sub = subparsers.add_parser("compile", help="Compile RTL testbench")
-    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog"])
+    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog", "verilator"])
     sub.add_argument("--dump", default="on", choices=["on", "off"])
     sub.set_defaults(func=cmd_compile)
 
@@ -1011,7 +1120,7 @@ def main():
     # runcase
     sub = subparsers.add_parser("runcase", help="Compile + build + run a single case")
     sub.add_argument("--case", required=True, help="Case name")
-    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog"])
+    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog", "verilator"])
     sub.add_argument("--dump", default="on", choices=["on", "off"])
     sub.add_argument(
         "--timeout", default=None,
@@ -1021,7 +1130,7 @@ def main():
 
     # regress
     sub = subparsers.add_parser("regress", help="Run all cases (parallel supported)")
-    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog"])
+    sub.add_argument("--sim", default="vcs", choices=["vcs", "nc", "iverilog", "verilator"])
     sub.add_argument("--dump", default="on", choices=["on", "off"])
     sub.add_argument(
         "-j", type=int, default=1,
@@ -1030,6 +1139,10 @@ def main():
     sub.add_argument(
         "--timeout", default=None,
         help="Simulation time limit per case (e.g., 1us, 500ns, 3s)",
+    )
+    sub.add_argument(
+        "--cases", default=None,
+        help="Comma-separated subset of cases to run (e.g., ISA_INT,coremark; default: all)",
     )
     sub.set_defaults(func=cmd_regress)
 
