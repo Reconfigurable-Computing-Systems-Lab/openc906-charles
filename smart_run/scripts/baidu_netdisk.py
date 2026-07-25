@@ -5,9 +5,11 @@ Requires BaiduPCS-Go on PATH (https://github.com/qjfoidnh/BaiduPCS-Go):
     brew install baidupcs-go        # or download a release binary
 
 If not logged in (uploads need both BDUSS and STOKEN), the script launches
-Chrome with a throwaway profile pointed at pan.baidu.com, waits for you to
-log in, pulls the BDUSS/STOKEN cookies out via the Chrome DevTools Protocol,
-and runs `BaiduPCS-Go login` automatically. Stdlib only.
+a browser (Chrome/Chromium/Edge, or Firefox as a fallback) with a throwaway
+profile pointed at pan.baidu.com, waits for you to log in, pulls the
+BDUSS/STOKEN cookies out (Chrome DevTools Protocol for Chromium, or the
+profile's cookies.sqlite for Firefox), and runs `BaiduPCS-Go login`
+automatically. Stdlib only.
 
 Usage:
     python3 baidu_netdisk.py upload   <local_path>...  <remote_dir>
@@ -22,6 +24,7 @@ import os
 import re
 import shutil
 import socket
+import sqlite3
 import struct
 import subprocess
 import sys
@@ -125,24 +128,81 @@ CHROME_CANDIDATES = [
     shutil.which("chromium") or "",
 ]
 
+FIREFOX_CANDIDATES = [
+    "/usr/bin/firefox",
+    "/usr/bin/firefox-esr",
+    "/usr/lib64/firefox/firefox",
+    shutil.which("firefox") or "",
+    shutil.which("firefox-esr") or "",
+]
 
-def find_chrome():
+
+def find_browser():
+    """Return (binary_path, kind) where kind is 'chrome' or 'firefox'.
+
+    Firefox is the common fallback on headless Linux servers where Chrome
+    isn't installed; its CDP endpoint is unreliable, so the caller reads
+    cookies straight from the profile's cookies.sqlite instead.
+    """
     for c in CHROME_CANDIDATES:
         if c and os.path.exists(c):
-            return c
-    sys.exit("ERROR: no Chrome/Chromium/Edge found for the login flow.")
+            return c, "chrome"
+    for c in FIREFOX_CANDIDATES:
+        if c and os.path.exists(c):
+            return c, "firefox"
+    sys.exit("ERROR: no Chrome/Chromium/Edge/Firefox found for the login flow.")
+
+
+def cookies_from_sqlite(profile_dir, want=("BDUSS", "STOKEN")):
+    """Read Baidu cookies from a Firefox profile's cookies.sqlite (WAL-safe)."""
+    db = os.path.join(profile_dir, "cookies.sqlite")
+    if not os.path.exists(db):
+        return {}
+    try:
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=1)
+        rows = conn.execute(
+            "SELECT name, value FROM moz_cookies WHERE host LIKE '%baidu.com'"
+        ).fetchall()
+        conn.close()
+    except sqlite3.Error:
+        return {}
+    return {n: v for n, v in rows if n in want}
 
 
 def browser_login():
-    chrome = find_chrome()
+    browser, kind = find_browser()
     profile = tempfile.mkdtemp(prefix="baidu_login_")
-    print("Opening a browser window — please log in to Baidu Netdisk...")
-    proc = subprocess.Popen(
-        [chrome, f"--remote-debugging-port={DEBUG_PORT}", f"--user-data-dir={profile}",
-         "--no-first-run", "--no-default-browser-check", LOGIN_URL],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"Opening {kind} — please log in to Baidu Netdisk...")
+    if kind == "firefox":
+        # Firefox's --remote-debugging-port CDP endpoint is unreliable on many
+        # builds (404s on /json/version); read cookies from the profile's
+        # cookies.sqlite instead. No CDP port needed.
+        cmd = [browser, "--no-remote", "--new-instance", "--profile", profile,
+               LOGIN_URL]
+    else:
+        cmd = [browser, f"--remote-debugging-port={DEBUG_PORT}",
+               f"--user-data-dir={profile}", "--no-first-run",
+               "--no-default-browser-check", LOGIN_URL]
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        # wait for the CDP endpoint, get the browser-level websocket URL
+        if kind == "firefox":
+            deadline = time.time() + 600  # 10 min to log in
+            print("Waiting for BDUSS + STOKEN cookies in Firefox profile...")
+            while time.time() < deadline:
+                jar = cookies_from_sqlite(profile)
+                if "BDUSS" in jar and "STOKEN" in jar:
+                    print("Got BDUSS and STOKEN — logging in BaiduPCS-Go...")
+                    r = pcs("login", f"-bduss={jar['BDUSS']}", f"-stoken={jar['STOKEN']}",
+                            capture=True)
+                    print(r.stdout.strip())
+                    if r.returncode != 0 or not logged_in():
+                        sys.exit("ERROR: BaiduPCS-Go login failed:\n" + r.stdout + r.stderr)
+                    print("BaiduPCS-Go login successful. Closing browser...")
+                    return
+                time.sleep(2)
+            sys.exit("ERROR: timed out waiting for Baidu login (10 min).")
+
+        # Chrome/Chromium/Edge path: pull cookies via Chrome DevTools Protocol.
         ws_url = None
         for _ in range(60):
             try:
@@ -157,6 +217,7 @@ def browser_login():
 
         sock = ws_connect(ws_url)
         deadline = time.time() + 600  # 10 min to log in
+        print("Waiting for BDUSS + STOKEN cookies via Chrome DevTools Protocol...")
         while time.time() < deadline:
             cookies = cdp_call(sock, 1, "Storage.getCookies").get("cookies", [])
             jar = {c["name"]: c["value"] for c in cookies if c["domain"].endswith("baidu.com")}
@@ -167,11 +228,16 @@ def browser_login():
                 print(r.stdout.strip())
                 if r.returncode != 0 or not logged_in():
                     sys.exit("ERROR: BaiduPCS-Go login failed:\n" + r.stdout + r.stderr)
+                print("BaiduPCS-Go login successful. Closing browser...")
                 return
             time.sleep(2)
         sys.exit("ERROR: timed out waiting for Baidu login (10 min).")
     finally:
         proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
         shutil.rmtree(profile, ignore_errors=True)
 
 # --------------------------------------------------------------------- main
