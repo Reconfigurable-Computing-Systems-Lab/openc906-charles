@@ -1,7 +1,7 @@
 ################################################################################
 # User configuration
 ################################################################################
-set PROJ_ROOT       /dfs/usrhome/jjiangan/github/hw_charles
+set PROJ_ROOT       /dfs/usrhome/jjiangan/github/openc906-charles-imp
 set RTL_ROOT        ${PROJ_ROOT}/C906_RTL_FACTORY
 set SDC_ROOT        ${PROJ_ROOT}/smart_run/impl/sdc
 set TOP_MODULE_NAME openC906

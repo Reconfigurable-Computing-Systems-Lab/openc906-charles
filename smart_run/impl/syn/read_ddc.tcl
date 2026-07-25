@@ -2,7 +2,7 @@
 # Read an existing mapped DDC for interactive analysis (timing/area/power).
 # Usage:  dc_shell -f read_ddc.tcl   (BATCH_DIR exported by run_dc.csh)
 ################################################################################
-set PROJ_ROOT       /dfs/usrhome/jjiangan/github/hw_charles
+set PROJ_ROOT       /dfs/usrhome/jjiangan/github/openc906-charles-imp
 set SRAM_DB_DIR     ${PROJ_ROOT}/smart_run/impl/gen_sram/db
 set TOP_MODULE_NAME openC906
 

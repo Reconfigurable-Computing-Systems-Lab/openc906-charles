@@ -12,11 +12,12 @@
 #                        and collects work_par/results/<case>.fsdb + fsdb_run_list.txt
 #                        (core scope by default; each segment its own FSDB, no merge).
 set -u
-export CODE_BASE_PATH=/Users/jingbo.jiang/Documents/GitHub/openc906-charles/C906_RTL_FACTORY
-export TOOL_EXTENSION=$HOME/tools/riscv-wrap
-export CONVERT="python3 /Users/jingbo.jiang/Documents/GitHub/openc906-charles/smart_run/tests/bin/srec2vmem.py"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export CODE_BASE_PATH="$(cd "$ROOT/../C906_RTL_FACTORY" && pwd)"
+export TOOL_EXTENSION="${TOOL_EXTENSION:-/dfs/usrhome/jjiangan/apps/Xuantie-900-gcc-elf-newlib-x86_64-V3.3.0/bin}"
+export CONVERT="python3 $ROOT/tests/bin/srec2vmem.py"
 export THEAD_GCC=0
-ROOT=/Users/jingbo.jiang/Documents/GitHub/openc906-charles/smart_run
 cd "$ROOT"
 
 SIM=verilator

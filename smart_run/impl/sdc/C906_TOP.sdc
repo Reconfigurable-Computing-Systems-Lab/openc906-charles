@@ -16,7 +16,8 @@ set IF_READ_BUIDIN_VARIABLES 0 ;# For standalone usage, set to "1" ; For synthes
 set SYS_APB_SYNC      0 ; # For sync apb set to "1", for async apb set to "0"
 set SYS2CPU_CLK_RATIO 2 ;# Set ratio(multicycle) for sys axi clk compared to cpuclk, default "2"
 
-set CPU_PERIOD   [expr (1000.00/1000)] ;# CPU is constrained at 1.0GHz
+if {![info exists ::env(CPU_FREQ_MHZ)]} { set ::env(CPU_FREQ_MHZ) 1000 }
+set CPU_PERIOD   [expr (1000.00/$::env(CPU_FREQ_MHZ))] ;# CPU period (ns); default 1.0 GHz (CPU_FREQ_MHZ=1000)
 
 if {$IF_READ_BUIDIN_VARIABLES} {
    set SETUP_UNCERTAINTY 0.2
