@@ -1,15 +1,13 @@
 ################################################################################
-# PrimePower Time-Based Power Analysis Script  (gate-level FSDB replay)
+# PrimePower Time-Based Power Analysis Script  (RTL FSDB replay w/ ptpxmap)
 # Design : openC906 (T-Head C906 core top)
 # Process: TSMC 28nm HPC+
-# FSDB   : gate-level simulation waveform (smart_run/impl/gls results)
+# FSDB   : RTL simulation waveform (smart_run/fsdb_out or impl/gls results)
 ################################################################################
 
 ################################################################################
 # Step 0: project paths and directories
 ################################################################################
-set PROJ_ROOT /dfs/usrhome/jjiangan/github/hw_charles
-set SYN_ROOT  ${PROJ_ROOT}/smart_run/impl/syn
 
 # Parse the input directory (synthesis results)
 if {[info exists ::env(IN_DIR)]} {
@@ -19,6 +17,15 @@ if {[info exists ::env(IN_DIR)]} {
   puts "Usage: run_ptpx_parallel.py --in_dir <input_directory> --fsdb_names <fsdb>"
   exit 1
 }
+
+# Resolve project root: env override wins, else derive from IN_DIR
+# (.../smart_run/impl/syn/<batch> -> repo root is 4 levels up)
+if {[info exists ::env(PROJ_ROOT)]} {
+  set PROJ_ROOT $::env(PROJ_ROOT)
+} else {
+  set PROJ_ROOT [file normalize ${IN_DIR}/../../../..]
+}
+set SYN_ROOT  ${PROJ_ROOT}/smart_run/impl/syn
 
 # Parse the output directory (reports and results)
 if {[info exists ::env(OUT_DIR)]} {
@@ -131,6 +138,20 @@ if {![file exists ${SDC_FILE}]} {
 read_sdc ${SDC_FILE}
 
 ################################################################################
+# Step 4b: re-target the CPU clock to the requested period (CLK_PERIOD)
+################################################################################
+# The mapped SDC carries the synthesis-period CPU_CLK (0.833 ns @1.2 GHz for
+# this batch). Override it to CLK_PERIOD ns so timing/power reflect the target
+# operating frequency. Re-creating the clock on the same port/name replaces the
+# SDC definition; name-based I/O constraints remain valid.
+if {![llength [get_ports pll_core_cpuclk]]} {
+  puts "Warning: port pll_core_cpuclk not found; skipping clock re-target."
+} else {
+  create_clock [get_ports pll_core_cpuclk] -name CPU_CLK \
+    -period ${CLK_PERIOD} -waveform [list 0 [expr {$CLK_PERIOD / 2.0}]]
+}
+
+################################################################################
 # Step 5: back-annotation
 ################################################################################
 # No SPEF file -- skipping parasitic annotation.
@@ -144,23 +165,38 @@ update_timing
 report_timing > ${OUT_DIR}/reports/${DESIGN_TOP}_timing.rpt
 
 ################################################################################
-# Step 7: read switching activity from the gate-level simulation FSDB
+# Step 7: read switching activity from the RTL simulation FSDB
 ################################################################################
-# The FSDB comes from the SDF-annotated gate-level sim (smart_run/impl/gls),
-# which uses the same testbench hierarchy as the behavioral sim, so only the
-# testbench prefix has to be stripped; signal names already match the netlist
-# (no -rtl flag, no DC ptpxmap needed).
+# Source the RTL-to-gate name mapping produced by DC (saif_map -type ptpx).
+# It maps RTL register/net names to their gate-level equivalents so that
+# PrimePower can correctly annotate the RTL FSDB onto the gate netlist.
+set MAP_FILE ${IN_DIR}/results/${DESIGN_TOP}.ptpxmap.tcl
+if {[file exists ${MAP_FILE}]} {
+  suppress_message PWR-019
+  source ${MAP_FILE}
+} elseif {[file exists ${MAP_FILE}.gz]} {
+  suppress_message PWR-019
+  exec gunzip -k ${MAP_FILE}.gz
+  source ${MAP_FILE}
+} else {
+  puts "Fatal: rtl-gate map file ${MAP_FILE} (or .gz) not found."
+  exit 1
+}
+
+# The FSDB was captured from an RTL simulation, so use -strip_path to remove
+# the testbench hierarchy prefix and -rtl to tell PrimePower the FSDB carries
+# RTL signal names (mapped via the ptpxmap sourced above).
 #
 # When START_NS / END_NS are provided, pass -time to read_fsdb so that only the
 # requested window of the FSDB is loaded (saves memory and runtime).
 if {$USE_TIME_WINDOW} {
-  puts "INFO: Reading FSDB time window \[${START_NS} ns .. ${END_NS} ns\]"
-  read_fsdb -strip_path ${STRIP_PATH} \
+  puts "INFO: Reading RTL FSDB time window \[${START_NS} ns .. ${END_NS} ns\]"
+  read_fsdb -strip_path ${STRIP_PATH} -rtl \
     -time [list $START_NS $END_NS] \
     ${FSDB_NAME}
 } else {
-  puts "INFO: Reading full FSDB (no time window specified)"
-  read_fsdb -strip_path ${STRIP_PATH} ${FSDB_NAME}
+  puts "INFO: Reading full RTL FSDB (no time window specified)"
+  read_fsdb -strip_path ${STRIP_PATH} -rtl ${FSDB_NAME}
 }
 
 ################################################################################

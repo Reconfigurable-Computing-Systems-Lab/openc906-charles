@@ -401,7 +401,8 @@ begin
       `ifdef FSDB_FULL_SOC
         $fsdbDumpvars();
       `else
-        $fsdbDumpvars(0, `CPU_TOP);
+        // Dump aq_core and all its submodules (narrower than CPU_TOP).
+        $fsdbDumpvars(0, `CPU_TOP.x_aq_top_0.x_aq_core);
       `endif
         if ($value$plusargs("FSDB_BEGIN=%f", fsdb_begin)) begin
           $fsdbDumpoff;

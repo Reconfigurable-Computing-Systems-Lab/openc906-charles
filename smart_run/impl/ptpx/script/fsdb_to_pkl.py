@@ -50,7 +50,7 @@ POWER_UNITS = {
     "aw": 1e-18,
 }
 
-TIME_HDR_RE = re.compile(r"Time\((\d+)([a-zA-Z]+)\)")
+TIME_HDR_RE = re.compile(r"Time\((\d+(?:\.\d+)?)([a-zA-Z]+)\)")
 POWER_VALUE_RE = re.compile(
     r"^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\s*"
     r"(?:w|mw|uw|\u00b5w|nw|pw|fw|aw)$",
@@ -173,7 +173,7 @@ def _time_unit_ns(time_col: str) -> float:
     m = TIME_HDR_RE.match(time_col)
     if not m:
         raise RuntimeError(f"unrecognised time header '{time_col}'")
-    scale = int(m.group(1))
+    scale = float(m.group(1))
     unit = m.group(2).lower()
     if unit not in TIME_UNIT_NS:
         raise RuntimeError(f"unknown time unit '{unit}' in header '{time_col}'")

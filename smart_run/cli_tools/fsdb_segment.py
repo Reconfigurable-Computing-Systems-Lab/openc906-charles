@@ -96,19 +96,23 @@ def parse_fsdb_info(fsdb_path):
 
     result = {}
 
-    # Parse minimum xtag — e.g. "minimum xtag             : (0 0) or (0fs)"
-    m = re.search(r"minimum xtag\s*:\s*\([^)]*\)\s*or\s*\((\d+)fs\)", output)
+    # xtag unit matches the FSDB scale unit: "fs", "ps", or "ns".
+    # Convert the value to femtoseconds so downstream fs_to_ns stays correct.
+    unit_to_fs = {"f": 1, "p": 1000, "n": 1_000_000}
+
+    # Parse minimum xtag — e.g. "minimum xtag : (0 0) or (0ps)" or "(0fs)"
+    m = re.search(r"minimum xtag\s*:\s*\([^)]*\)\s*or\s*\((\d+)([fpn]?)s\)", output)
     if m:
-        result["min_time_fs"] = int(m.group(1))
+        result["min_time_fs"] = int(m.group(1)) * unit_to_fs.get(m.group(2), 1)
     else:
         raise RuntimeError(
             f"Could not parse minimum xtag from fsdbdebug output for {fsdb_path}"
         )
 
-    # Parse maximum xtag — e.g. "maximum xtag             : (97 680172288) or (41729200000000fs)"
-    m = re.search(r"maximum xtag\s*:\s*\([^)]*\)\s*or\s*\((\d+)fs\)", output)
+    # Parse maximum xtag — e.g. "maximum xtag : (0 598030500) or (598030500ps)"
+    m = re.search(r"maximum xtag\s*:\s*\([^)]*\)\s*or\s*\((\d+)([fpn]?)s\)", output)
     if m:
-        result["max_time_fs"] = int(m.group(1))
+        result["max_time_fs"] = int(m.group(1)) * unit_to_fs.get(m.group(2), 1)
     else:
         raise RuntimeError(
             f"Could not parse maximum xtag from fsdbdebug output for {fsdb_path}"
