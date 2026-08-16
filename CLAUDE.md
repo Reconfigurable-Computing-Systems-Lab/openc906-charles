@@ -29,7 +29,9 @@ make cleansim / cleancase / clean    # remove sim products / case products / all
 
 **Runtime timeout**: default 3s sim time (`MAX_RUN_TIME 3_000_000_000.0` ns in tb.v); override per-run with the plusarg `+MAX_SIM_TIME=<ns>` (accepts reals, e.g. `./simv +MAX_SIM_TIME=1000000.0`).
 
-Test cases (`CASE_LIST` in `smart_run/setup/smart_cfg.mk`): `ISA_THEAD ISA_INT ISA_LS ISA_FP coremark MMU interrupt exception debug csr cache conv_softmax`. Others exist under `tests/cases/` (e.g. `ISA/ISA_VECTOR/`) but must be added to `smart_cfg.mk` first.
+Test cases (`CASE_LIST` in `smart_run/setup/smart_cfg.mk`): `ISA_THEAD ISA_INT ISA_LS ISA_FP coremark MMU interrupt exception debug csr cache conv_softmax cp0_random`. Others exist under `tests/cases/` (e.g. `ISA/ISA_VECTOR/`) but must be added to `smart_cfg.mk` first.
+
+`cp0_random` is the randomized CP0 stress test (`doc/specs/cp0-design-and-test.md` Part II): ~100K seeded dynamic iterations over 42 operation groups, tuned by `CP0_ITERS` / `CP0_SEED` / `CP0_EXTRA`. It writes a per-port toggle report for `aq_cp0_top` to `work/cp0_toggle.report` alongside the usual PASS/FAIL, and `tests/cases/cp0_random/run_groups.sh` bisects one group at a time. Not supported under `SIM=iverilog` (its filelist carries a `+define+`).
 
 ## Architecture
 
@@ -119,3 +121,5 @@ Five-stage server-side flow (TSMC 28HPC+; all `/dfs/...` tool paths and `PROJ_RO
 ## doc/ Index
 
 `tb-reference.md` (TB signal probing — partially stale), `expand-sram-plan.md` (256MB SRAM expansion, implemented), `csi-nn2-bare-metal-guide.md` (workflow B + bug analyses), `c906_synthesis_power_flow_report.md` (synthesis+PTPX flow), `nn-model-auto-discovery-plan.md` / `smart-runner-plan.md` (implemented plans), `reproduce_onnx_models_and_inputs.md` (ONNX model zoo download, ran on another machine), plus the official C906 user guide / integration guide / datasheet PDFs.
+
+**Note: the list above is stale** — several named files no longer exist (`tb-reference.md` among them, despite being cited at line 55) and the tree is now `doc/{specs,results,pdfs}/`. Current contents: `doc/c906-hier.md` (aq_core level-1 submodule tree) · `doc/specs/` — `cp0-design-and-test.md` (**the CP0 reference**, §1-§15: hierarchy, CSR map ownership, trap/interrupt/debug architecture, verified RTL gotchas; **plus the `cp0_random` stress test**, §16-§23: 42-group coverage matrix, the port-toggle monitor, and the safety rails WFI/delegation/cache-maintenance need), `c906_key_func_signals.md`, `csi-nn2-bare-metal-guide.md`, `verilator-mobilenet-flow.md` · `doc/results/` — `aq_core_lvl1_inports.md`, `aq_core_all_net_paths.txt`, `c906_module_hier.txt` · `doc/pdfs/` — official user guide / datasheet.

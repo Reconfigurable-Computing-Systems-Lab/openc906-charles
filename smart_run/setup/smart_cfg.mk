@@ -28,6 +28,7 @@ CASE_LIST := \
       csr \
       cache \
       conv_softmax \
+      cp0_random \
 
 
 ISA_THEAD_build:
@@ -100,6 +101,33 @@ cache_build:
 	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd  ENDIAN_MODE=little-endian CASENAME=cache FILE=C906_IDCACHE_OPER >& cache_build.case.log 
 
 
+################################################################################
+# cp0_random -- randomized CP0 stress test.
+#
+# CP0_ITERS is the number of dynamic dispatch-loop iterations (100k by default);
+# CP0_SEED seeds the in-test xorshift64 generator, so a run is reproducible.
+# Both are overridable on the make command line, e.g.
+#   make runcase CASE=cp0_random SIM=vcs DUMP=off CP0_ITERS=5000
+#
+# -fno-optimize-sibling-calls is mandatory (see CLAUDE.md "Known Bugs": jr-based
+# tail calls stall retirement on this RTL). -fno-jump-tables removes the only
+# other computed jr, the big dispatch switch.
+################################################################################
+# CP0_EXTRA passes extra -D flags through, e.g. -DCP0_ONLY_GROUP=21 to run a
+# single operation group. tests/cases/cp0_random/run_groups.sh uses it to bisect.
+CP0_ITERS ?= 100000
+CP0_SEED  ?= 0x2024C906
+CP0_EXTRA ?=
+
+cp0_random_build:
+	@cp ./tests/cases/cp0_random/C906_CP0_RANDOM.c ./work
+	@cp ./tests/cases/cp0_random/cp0_trap.S ./work
+	@cp ./tests/cases/cp0_random/cp0_csrs.h ./work
+	@cp ./tests/cases/cp0_random/cp0_th_insn.h ./work
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=cp0_random FILE=C906_CP0_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables -DCP0_ITERS=$(CP0_ITERS) -DCP0_SEED=$(CP0_SEED) $(CP0_EXTRA)" >& cp0_random_build.case.log
+
+
 CSI_NN2_INSTALL := ../../csi-nn2/install_nn2/c906
 conv_softmax_build:
 	@cp ./tests/cases/conv_softmax/bare_main.c ./work
@@ -154,6 +182,15 @@ $(foreach case,$(MODEL_CASES),$(eval $(call NN_MODEL_BUILD,$(case))))
 # Adjust verilog filelist for *.v case...
 ifeq ($(CASE), debug)
 SIM_FILELIST := ../tests/cases/debug/JTAG_DRV.vh ../tests/cases/debug/C906_DEBUG_PATTERN.v
+endif
+
+# cp0_random pulls in the CP0 port-toggle monitor plus +define+CP0_TOGGLE_MON.
+# It goes through a filelist rather than SIMULATOR_DEF because the Makefile
+# assigns SIMULATOR_DEF with := per backend, after including this file.
+# (vcs / irun / verilator all accept options inside a -f filelist; iverilog
+# does not, so this case is vcs / nc / verilator only.)
+ifeq ($(CASE), cp0_random)
+SIM_FILELIST := -f ../tests/cases/cp0_random/cp0_mon.f
 endif
 
 

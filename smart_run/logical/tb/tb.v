@@ -301,6 +301,13 @@ reg [39:0] cpu_awaddr;
 reg [3:0]  cpu_awlen;
 reg [15:0] cpu_wstrb;
 reg        cpu_wvalid;
+// Write data must be delayed alongside the address/strobe/valid qualifiers
+// below. Reading `SOC_TOP.biu_pad_wdata live in the console decoder while
+// qualifying on the registered signals is a one-cycle skew, which prints
+// whatever happens to be on the bus a cycle later instead of the byte that was
+// actually qualified -- that is why UART output from tests used to come out
+// with characters missing or wrong.
+reg [127:0] cpu_wdata;
 reg [63:0] value0;
 reg [63:0] value1;
 
@@ -311,6 +318,7 @@ begin
   cpu_awaddr[31:0] <= `SOC_TOP.biu_pad_awaddr[31:0];
   cpu_wvalid       <= `SOC_TOP.biu_pad_wvalid;
   cpu_wstrb        <= `SOC_TOP.biu_pad_wstrb;
+  cpu_wdata        <= `SOC_TOP.biu_pad_wdata[127:0];
   value0           <= `CPU_TOP.x_aq_top_0.x_aq_core.x_aq_rtu_top.x_aq_rtu_wb.wb_wb0_data[63:0];
   value1           <= `CPU_TOP.x_aq_top_0.x_aq_core.x_aq_rtu_top.x_aq_rtu_wb.wb_wb1_data[63:0];
 end
@@ -348,23 +356,23 @@ begin
   begin
    FILE = $fopen("run_case.report","a");
     if(cpu_wstrb[15:0] == 16'hf) begin
-      $write("%c", `SOC_TOP.biu_pad_wdata[7:0]);
-      $fwrite(FILE,"%c",`SOC_TOP.biu_pad_wdata[7:0]);
+      $write("%c", cpu_wdata[7:0]);
+      $fwrite(FILE,"%c",cpu_wdata[7:0]);
       $fclose(FILE);
    end
    else if(cpu_wstrb[15:0] == 16'hf0) begin
-      $write("%c", `SOC_TOP.biu_pad_wdata[39:32]);
-      $fwrite(FILE,"%c",`SOC_TOP.biu_pad_wdata[39:32]);
+      $write("%c", cpu_wdata[39:32]);
+      $fwrite(FILE,"%c",cpu_wdata[39:32]);
       $fclose(FILE);
    end
    else if(cpu_wstrb[15:0] == 16'hf00) begin
-      $write("%c", `SOC_TOP.biu_pad_wdata[71:64]);
-      $fwrite(FILE,"%c",`SOC_TOP.biu_pad_wdata[71:64]);
+      $write("%c", cpu_wdata[71:64]);
+      $fwrite(FILE,"%c",cpu_wdata[71:64]);
       $fclose(FILE);
    end
    else if(cpu_wstrb[15:0] == 16'hf000) begin
-      $write("%c", `SOC_TOP.biu_pad_wdata[103:96]);
-      $fwrite(FILE,"%c",`SOC_TOP.biu_pad_wdata[103:96]);
+      $write("%c", cpu_wdata[103:96]);
+      $fwrite(FILE,"%c",cpu_wdata[103:96]);
       $fclose(FILE);
    end
   end
@@ -437,6 +445,16 @@ soc x_soc(
   .o_pad_uart0_sout    ( uart0_sout           ),
   .i_pad_rst_b         ( rst_b                )
 );
+
+// CP0 port-toggle monitor. Compiled in only when a case asks for it (the
+// cp0_random case does, via ../tests/cases/cp0_random/cp0_mon.f). Writes
+// work/cp0_toggle.report at $finish; see cli_tools/gen_cp0_toggle_mon.py.
+`ifdef CP0_TOGGLE_MON
+cp0_toggle_mon x_cp0_toggle_mon(
+  .clk                 ( clk                  ),
+  .rst_b               ( rst_b                )
+);
+`endif
 
 
 
