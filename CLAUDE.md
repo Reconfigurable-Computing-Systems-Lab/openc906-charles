@@ -16,22 +16,33 @@ All simulation runs from `smart_run/`; artifacts land in `smart_run/work/`.
 
 ```bash
 make showcase                        # list all valid CASE names
-make compile [SIM=vcs|nc|iverilog] [DUMP=on|off]   # compile RTL + TB (default SIM=vcs, DUMP=on)
+make compile [SIM=vcs|nc|iverilog|verilator] [DUMP=on|off]   # compile RTL + TB (default SIM=vcs, DUMP=on)
 make buildcase CASE=ISA_INT          # cross-compile one test to inst.pat/data.pat
 make runcase CASE=ISA_INT [SIM=...] [DUMP=...]     # compile + build + run one test
-make regress                         # sequential full regression; report at tests/regress/regress_report
+make regress [REGRESS_LIST="..."]    # sequential full regression; report at <repo>/regress/regress_report
 make cleansim / cleancase / clean    # remove sim products / case products / all of work/
+make covreport / cleancov            # per-unit coverage report / remove smart_run/cov/
 ```
+
+Extra knobs: `SIM_ARGS=+MAX_SIM_TIME=4e6` passes plusargs to the run step (there
+was no other way to reach them from `make`); `COVERAGE=line|all` turns on code
+coverage (Verilator `--coverage-line[+--coverage-toggle]`, VCS `-cm`), which
+forces `DUMP=off` unless `COV_ALLOW_DUMP=1`; `MON=all` compiles all five per-unit
+port-toggle monitors so any case can be measured against every pipeline unit at
+once. Coverage artifacts accumulate in `smart_run/cov/` (gitignored) — `work/` is
+wiped between regression cases.
 
 `iverilog` (open-source) is fully supported even though `make help` only mentions vcs/nc. `DUMP=off` defines `NO_DUMP` (skip waveforms — use for regressions). Waveforms: FSDB for VCS, VCD for irun/iverilog, in `work/`.
 
 **Test output**: result in `work/run_case.report` (PASS/FAIL + UART text), sim log `work/run.{vcs,irun,iverilog}.log`, build log `work/<CASE>_build.case.log`.
 
-**Runtime timeout**: default 3s sim time (`MAX_RUN_TIME 3_000_000_000.0` ns in tb.v); override per-run with the plusarg `+MAX_SIM_TIME=<ns>` (accepts reals, e.g. `./simv +MAX_SIM_TIME=1000000.0`).
+**Runtime timeout**: default 3s sim time (`MAX_RUN_TIME 3_000_000_000.0` ns in tb.v); override per-run with `make runcase ... SIM_ARGS=+MAX_SIM_TIME=<ns>` (accepts reals). This matters: a livelock that *retires* instructions is invisible to the 50,000-cycle no-retire watchdog, so only the sim-time limit catches it — and 3e9 ns at Verilator's ~118 kcycle/s is hours.
 
-Test cases (`CASE_LIST` in `smart_run/setup/smart_cfg.mk`): `ISA_THEAD ISA_INT ISA_LS ISA_FP coremark MMU interrupt exception debug csr cache conv_softmax cp0_random`. Others exist under `tests/cases/` (e.g. `ISA/ISA_VECTOR/`) but must be added to `smart_cfg.mk` first.
+Test cases (`CASE_LIST` in `smart_run/setup/smart_cfg.mk`): `ISA_THEAD ISA_INT ISA_LS ISA_FP coremark MMU interrupt exception debug csr cache conv_softmax cp0_random iu_random vidu_random idu_random ifu_random`. Others exist under `tests/cases/` (e.g. `ISA/ISA_VECTOR/`) but must be added to `smart_cfg.mk` first. `REGRESS_LIST` (default `CASE_LIST`) selects what `make regress` runs — use `REGRESS_LIST="$(filter-out $(RAND_CASES),$(CASE_LIST))"` to skip the randomized cases.
 
 `cp0_random` is the randomized CP0 stress test (`doc/specs/cp0-design-and-test.md` Part II): ~100K seeded dynamic iterations over 42 operation groups, tuned by `CP0_ITERS` / `CP0_SEED` / `CP0_EXTRA`. It writes a per-port toggle report for `aq_cp0_top` to `work/cp0_toggle.report` alongside the usual PASS/FAIL, and `tests/cases/cp0_random/run_groups.sh` bisects one group at a time. Not supported under `SIM=iverilog` (its filelist carries a `+define+`).
+
+`iu_random` / `vidu_random` / `idu_random` / `ifu_random` apply the same methodology to the four pipeline units — **the reference is `doc/specs/unit-random-tests.md`**. Each is a seeded dispatch loop over 42-46 groups aimed at named RTL structures, tuned by `<U>_ITERS` / `<U>_SEED` / `<U>_OPT` / `<U>_EXTRA` (`-D<U>_ONLY_GROUP=n` bisects; each case ships a `run_groups.sh`), and each writes `work/<unit>_toggle.report`. `<U>_OPT` is worth knowing about: changing the optimisation level changes GCC's instruction selection, i.e. changes the stimulus, so `-O0/-O1/-O2/-Os` are four different decode streams for free. All four share `tests/cases/rand_common/` (PRNG, trap handler with a cause histogram and an unwind path, PMP helper, baseline-state restore, D-cache-off UART printer) — `cp0_random` deliberately keeps its own copies; see that directory's README. Like `cp0_random`, none of the four works under `SIM=iverilog`. Two notes that surprise people: **`gen_rtl/vidu/` has no vector logic in this release** (every `*_vec` submodule is a commented-out `&Instance` and `decd_sel[5]=1'b0` makes every RVV instruction trap illegal), so `vidu_random` targets the scalar FP issue unit; and `ifu_random`'s stimulus is *generated code* — `gen_ifu_arena.py` emits a seeded `.text.arena` of raw encodings at build time, because IFU coverage is per-address-layout and C cannot express it.
 
 ## Architecture
 
@@ -54,7 +65,7 @@ Pipeline units live in `gen_rtl/<unit>/rtl/`: `ifu` (fetch, BHT/BTB/RAS, I$), `i
 
 `common/soc.v`: C906 + 128-bit AXI crossbar (`axi/axi_interconnect128.v`) + L3 SRAM (`axi/axi_slave128.v`: two `f_spsram_8388608x128` banks = 2×128MB, bank select `mem_addr[27]`, window `0x0–0x0FFFFFFF`) + UART/GPIO/Timer via AHB→APB.
 
-`tb/tb.v` loads pattern files into SRAM via `$readmemh`, watches RTU writeback GPRs for magic values — PASS `64'h444333222`, FAIL `64'h2382348720` — and declares FAIL if no instruction retires for 50,000 cycles (deadlock watchdog). `CLK_PERIOD` is `1.0` and must stay a *real* literal (integer `1/2=0` → zero-delay infinite loop). Hierarchy shortcut macros: `` `SOC_TOP ``, `` `CPU_TOP ``, `` `RTL_MEM ``, `` `RTL_MEM2 ``. Signal-probe reference: `doc/tb-reference.md` and `smart_run/key_signal.rc` (note: tb-reference's temp-array sizes are stale; trust tb.v).
+`tb/tb.v` loads pattern files into SRAM via `$readmemh`, watches RTU writeback GPRs for magic values — PASS `64'h444333222`, FAIL `64'h2382348720` — and declares FAIL if no instruction retires for 50,000 cycles (deadlock watchdog). `CLK_PERIOD` is `1.0` and must stay a *real* literal (integer `1/2=0` → zero-delay infinite loop). Hierarchy shortcut macros: `` `SOC_TOP ``, `` `CPU_TOP ``, `` `RTL_MEM ``, `` `RTL_MEM2 ``. Signal-probe reference: `smart_run/key_signal.rc` and `doc/specs/c906_key_func_signals.md` (the old `doc/tb-reference.md` no longer exists; trust tb.v itself for the temp-array sizes). **`tb.v:98` wipes SRAM only below `0x0016_3830`** — above that the RAM arrays are uninitialised, which reads as X under VCS and as 0 under Verilator, so never fetch or load there.
 
 Memory map: text `0x0` (inst.pat, 256KB) · data `0x40000` (data.pat, 256KB pattern; linker MEM2 region is 768KB) · NN input dual-mapped at `0x80000` (64KB, small models) and `0x01000000` (up to 32MB, `mem_nn_input_temp`) · stack top `0xEE000` · UART at AXI `0x10015000` (CPU-side address is `0x40015000` in `tests/lib/clib/uart.h`; tb snoops the AXI address for console capture).
 
@@ -66,7 +77,9 @@ Memory map: text `0x0` (inst.pat, 256KB) · data `0x40000` (data.pat, 256KB patt
 
 Each test dir under `tests/cases/<category>/` is compiled with `tests/lib/crt0.s` (inits GPRs/FPU/vector, enables caches, traps, jumps to `main`), linked with `tests/lib/linker.lcf`, converted ELF→`inst.pat`/`data.pat`, and signals completion by writing the magic value to a GPR. Mini libc (printf/UART/interrupts/timer) in `tests/lib/clib/`.
 
-**Adding a test**: create the dir, add a `<NAME>_build` recipe in `setup/smart_cfg.mk` (copy an existing `*_build:` target), append the name to `CASE_LIST`.
+**Adding a test**: create the dir, add a `<NAME>_build` recipe in `setup/smart_cfg.mk` (copy an existing `*_build:` target), append the name to `CASE_LIST`. Copy files into `work/` **one at a time**, never `cp dir/*` — `tests/lib/Makefile` globs every `.c`/`.s`/`.S` in `work/` and links the result, and `make cleancase` deletes `work/*.v`, so monitors, filelists and scripts must stay out. Note also that the case Makefile's `clean` removes `work/*.pat`, which is why `conv_softmax_build` and `ifu_random_build` copy their pattern files in *after* the build.
+
+For a new *randomized* test, start from `tests/cases/rand_common/` (shared PRNG, trap handler with a cause histogram and an unwind path, PMP helper, baseline-state restore, D-cache-off UART printer) and read its README plus `doc/specs/unit-random-tests.md` Part 0 §5 first — most of those rails exist because something hung without them.
 
 **NN model auto-discovery**: any `tests/cases/model_compiled/<name>/model.c` becomes a case automatically (`MODEL_CASES` glob in `smart_cfg.mk`) using the generic `NN_MODEL_BUILD` recipe — it links `tests/cases/nn_model_common/` scaffolding (`bare_main.c` entry, `sbrk.c` heap+stubs, `stubs/`) and runs `onnx_sim_lib/prepare_model.py` (patches `model.c` CSINN_C906→CSINN_REF, generates `test_data.h` + `input.pat`). `model_compiled/` doesn't exist in a fresh checkout — drop HHB output in and `make runcase CASE=<name>` works immediately.
 
@@ -89,7 +102,7 @@ then `make runcase CASE=conv_softmax SIM=vcs` (or drop HHB output into `model_co
 
 ## Known Bugs
 
-- **Indirect-jump tail calls hang the RTL**: `jr`-based tail calls through function-pointer tables in BSS (common in CSI-NN2) stall retirement → watchdog FAIL. Always compile library code with `-fno-optimize-sibling-calls`. Full analysis: `doc/csi-nn2-bare-metal-guide.md` §7.
+- **Indirect-jump tail calls hang the RTL**: an indirect jump used as a tail call — `jr <reg>`, i.e. `jalr x0, rs, 0`, with the target loaded from memory — stalls retirement → FAIL. `jalr ra, rs, 0` (a real call) is fine, and so is `ret`, so the trigger is narrower than "any `jalr` with `rd=x0`". Always compile library code with `-fno-optimize-sibling-calls`, and add `-fno-jump-tables` for anything with a large `switch` (GCC's dispatch table is the same construct). No computed `goto`, and no jumping into runtime-generated code with `jr`. Full analysis: `doc/specs/csi-nn2-bare-metal-guide.md` §7 — note the root cause there is an *uninitialised* `static void *table[]` in `.bss` (not in `data.pat`), so `jr` goes to 0, re-enters `__start`, and restarts forever. That livelock retires instructions, which is why the 50,000-cycle watchdog never fires and only `MAX_RUN_TIME` catches it.
 - **crt0.s trap vector table**: entries are `.long` (4 bytes) but the handler loads with `ld` (8 bytes) → infinite exception loop on any trap. Install your own `mtvec` handler in bare-metal code that needs traps.
 
 ## RTL Conventions
@@ -118,8 +131,23 @@ Five-stage server-side flow (TSMC 28HPC+; all `/dfs/...` tool paths and `PROJ_RO
   - `extract_rc.py --fsdb <f> --type all --level '*' --top tb.x_soc...x_cpu_top --out <f.rc>` — emit a Verdi .rc signal list of a module's I/O ports (drops clk/rst-like names)
 - Probing huge FSDBs: use windowed `fsdbreport -bt/-et`; monolithic dumps fail (~9.5GB files). See `doc/fsdb-read-coverage-investigation.md`.
 
+Not Verdi-related, but also in `smart_run/cli_tools/` (stdlib-only Python):
+- `gen_toggle_mon.py --unit <cp0|iu|idu|ifu|vidu> --out <f.v>` — generate the per-port toggle monitor for a pipeline-unit top by parsing its own `input`/`output` declarations. `--unit` fills in the RTL path, instance path, module name, guard macro and report filename. Bound into the TB behind a `+define+` carried by a `-f` filelist; writes `work/<unit>_toggle.report` at `$finish`.
+- `cov_report.py --dat <dir> [--baseline F.json] [--top-cold N]` — per-unit line/branch/toggle coverage from Verilator `coverage.dat` files or a VCS `urg -format text` report, with deltas against a committed baseline and a "coldest files + first uncovered lines" list. Driven by `make covreport`.
+- `list_nets.py` — Verilator `--json-only` net listing for a module (see the Verilator flow notes).
+
 ## doc/ Index
 
-`tb-reference.md` (TB signal probing — partially stale), `expand-sram-plan.md` (256MB SRAM expansion, implemented), `csi-nn2-bare-metal-guide.md` (workflow B + bug analyses), `c906_synthesis_power_flow_report.md` (synthesis+PTPX flow), `nn-model-auto-discovery-plan.md` / `smart-runner-plan.md` (implemented plans), `reproduce_onnx_models_and_inputs.md` (ONNX model zoo download, ran on another machine), plus the official C906 user guide / integration guide / datasheet PDFs.
+The tree is `doc/{specs,results,pdfs}/` plus `doc/c906-hier.md` (aq_core level-1 submodule tree).
 
-**Note: the list above is stale** — several named files no longer exist (`tb-reference.md` among them, despite being cited at line 55) and the tree is now `doc/{specs,results,pdfs}/`. Current contents: `doc/c906-hier.md` (aq_core level-1 submodule tree) · `doc/specs/` — `cp0-design-and-test.md` (**the CP0 reference**, §1-§15: hierarchy, CSR map ownership, trap/interrupt/debug architecture, verified RTL gotchas; **plus the `cp0_random` stress test**, §16-§23: 42-group coverage matrix, the port-toggle monitor, and the safety rails WFI/delegation/cache-maintenance need), `c906_key_func_signals.md`, `csi-nn2-bare-metal-guide.md`, `verilator-mobilenet-flow.md` · `doc/results/` — `aq_core_lvl1_inports.md`, `aq_core_all_net_paths.txt`, `c906_module_hier.txt` · `doc/pdfs/` — official user guide / datasheet.
+`doc/specs/`
+- `cp0-design-and-test.md` — **the CP0 reference.** §1-§15: hierarchy, CSR map ownership, trap/interrupt/debug architecture, verified RTL gotchas. §16-§23: the `cp0_random` stress test — 42-group coverage matrix, the port-toggle monitor, and the safety rails that WFI / delegation / cache maintenance need.
+- `unit-random-tests.md` — **the reference for `iu_random` / `vidu_random` / `idu_random` / `ifu_random`.** Part 0 is common: the shared harness, the knob table, coverage measurement (both simulators), the safety rails, and the reproducibility contract. Then one part per unit, a risk register, and a provenance note. Read Part 0 §5 before writing any new randomized case.
+- `c906_key_func_signals.md`, `csi-nn2-bare-metal-guide.md`, `verilator-mobilenet-flow.md`
+
+`doc/results/`
+- `cp0_toggle_baseline.report` — the committed `cp0_random` port-toggle baseline (169/201)
+- `<unit>_toggle_coremark_ref.report` (cp0/iu/idu/ifu/vidu) and `unit_coverage_baseline.json` — the **reference measurement**: what a real workload (`coremark`, one iteration, `MON=all COVERAGE=line`) already reaches, so each randomized case's contribution can be stated as a delta rather than an uninterpretable absolute
+- `aq_core_lvl1_inports.md`, `aq_core_all_net_paths.txt`, `c906_module_hier.txt`
+
+`doc/pdfs/` — official C906 user guide, integration guide, datasheet, the XuanTie C-series comparison table, and the SRAM-compiler guide. **Note these are image-only PDFs**: reading them needs poppler (`brew install poppler` for `pdftoppm`), which is not installed here, so the RTL decode tables are the working source of truth for encodings.

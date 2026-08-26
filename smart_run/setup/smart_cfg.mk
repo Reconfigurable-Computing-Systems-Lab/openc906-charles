@@ -30,6 +30,16 @@ CASE_LIST := \
       conv_softmax \
       cp0_random \
 
+# Randomized per-unit stress tests (doc/specs/unit-random-tests.md). They must
+# be in CASE_LIST because buildcase/runcase gate on membership. They ARE part of
+# the default regression, at the short default iteration counts below, so that a
+# future RTL change that hangs them is caught. To skip them:
+#   make regress REGRESS_LIST="$(filter-out $(RAND_CASES),$(CASE_LIST))"
+RAND_CASES := iu_random vidu_random idu_random ifu_random
+CASE_LIST  += $(RAND_CASES)
+
+REGRESS_LIST ?= $(CASE_LIST)
+
 
 ISA_THEAD_build:
 	@cp ./tests/cases/ISA/ISA_THEAD/* ./work
@@ -128,6 +138,140 @@ cp0_random_build:
 	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=cp0_random FILE=C906_CP0_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables -DCP0_ITERS=$(CP0_ITERS) -DCP0_SEED=$(CP0_SEED) $(CP0_EXTRA)" >& cp0_random_build.case.log
 
 
+################################################################################
+# iu_random / vidu_random / idu_random / ifu_random
+#
+# Randomized per-unit stress tests, modelled on cp0_random
+# (doc/specs/cp0-design-and-test.md Part II) and sharing tests/cases/rand_common/
+# for the trap handler, xorshift64 PRNG, PMP helper, baseline-state restore and
+# D-cache-off UART printer. Full description: doc/specs/unit-random-tests.md.
+#
+# Per case:
+#   <U>_ITERS  dynamic dispatch-loop iterations. Defaults are deliberately small
+#              so `make regress` stays usable; long-soak invocations are in the
+#              doc.
+#   <U>_SEED   xorshift64 seed -- fixes the entire data sequence.
+#   <U>_OPT    optimisation level. Changing it changes the compiler's
+#              instruction selection, i.e. changes the stimulus: the same source
+#              at -O0/-O1/-O2/-Os gives four different decode streams for free.
+#              Highest-value knob for idu/ifu.
+#   <U>_EXTRA  extra -D flags, e.g. -DIU_ONLY_GROUP=23 to bisect one group
+#              (tests/cases/<case>/run_groups.sh uses it).
+#
+# -fno-optimize-sibling-calls is mandatory (CLAUDE.md "Known Bugs": an indirect
+# jump used as a tail call stalls retirement on this RTL). -fno-jump-tables
+# removes the other computed jr, GCC's switch dispatch table.
+#
+# vidu is the *scalar FP* issue unit in this configuration -- every port is
+# vidu_*_fp_*, misa.V=0 and the vector side of aq_vidu_top.v is a tie-off block
+# -- so it builds c906fd. c906fdv must NOT be used: GCC 14 emits RVV 1.0 and
+# this RTL is RVV 0.7.1.
+#
+# Files are copied one at a time on purpose: tests/lib/Makefile globs work/*.c
+# work/*.s work/*.S and links every object, and `make cleancase` deletes
+# work/*.v -- so the generated monitor, the .f filelist and the bisect script
+# must never land in work/. Note also that the case Makefile's `clean` removes
+# work/*.pat, which is why ifu_random's far-stub pattern is copied in after the
+# build (same reason conv_softmax_build copies input.pat last).
+################################################################################
+RAND_COMMON       := ./tests/cases/rand_common
+RAND_COMMON_FILES := rand_common.h rand_csrs.h rand_th_insn.h rand_trap.S rand_lib.c
+
+# Calibrated, not guessed: measured cycles/iteration from a 200-iteration
+# bring-up run of each case (doc/results/unit_random_runlog.md R003), scaled
+# to land at roughly 90 s wall each under Verilator on macOS in the plain
+# configuration (no coverage, one monitor -- the cp0_random anchor is 118 us of
+# simulated time per wall-second). Four cases at 90 s adds ~6 min to a
+# regression. Long soaks pass a bigger value explicitly.
+IU_ITERS   ?= 16000
+IU_SEED    ?= 0x2024C906
+IU_OPT     ?= -O2
+IU_EXTRA   ?=
+
+iu_random_build:
+	@for f in $(RAND_COMMON_FILES); do cp $(RAND_COMMON)/$$f ./work; done
+	@cp ./tests/cases/iu_random/C906_IU_RANDOM.c ./work
+	@cp ./tests/cases/iu_random/iu_defs.h        ./work
+	@cp ./tests/cases/iu_random/iu_sweeps.S      ./work
+	@cp ./tests/cases/iu_random/iu_bju.S         ./work
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=iu_random FILE=C906_IU_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables $(IU_OPT) -DIU_ITERS=$(IU_ITERS) -DIU_SEED=$(IU_SEED) $(IU_EXTRA)" >& iu_random_build.case.log
+
+
+VIDU_ITERS ?= 10000
+VIDU_SEED  ?= 0x2024C906
+VIDU_OPT   ?= -O2
+VIDU_EXTRA ?=
+
+vidu_random_build:
+	@for f in $(RAND_COMMON_FILES); do cp $(RAND_COMMON)/$$f ./work; done
+	@cp ./tests/cases/vidu_random/C906_VIDU_RANDOM.c ./work
+	@cp ./tests/cases/vidu_random/vidu_defs.h        ./work
+	@cp ./tests/cases/vidu_random/vidu_sweeps.S      ./work
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=vidu_random FILE=C906_VIDU_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables $(VIDU_OPT) -DVIDU_ITERS=$(VIDU_ITERS) -DVIDU_SEED=$(VIDU_SEED) $(VIDU_EXTRA)" >& vidu_random_build.case.log
+
+
+IDU_ITERS  ?= 6000
+IDU_SEED   ?= 0x2024C906
+IDU_OPT    ?= -O2
+IDU_EXTRA  ?=
+
+idu_random_build:
+	@for f in $(RAND_COMMON_FILES); do cp $(RAND_COMMON)/$$f ./work; done
+	@cp ./tests/cases/idu_random/C906_IDU_RANDOM.c ./work
+	@cp ./tests/cases/idu_random/idu_defs.h        ./work
+	@cp ./tests/cases/idu_random/idu_encodings.h   ./work
+	@python3 ./tests/cases/idu_random/gen_idu_sweeps.py \
+	    --out-s ./work/idu_sweeps.S --out-h ./work/idu_sweeps.h
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=idu_random FILE=C906_IDU_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables -Wa,-mno-relax $(IDU_OPT) -DIDU_ITERS=$(IDU_ITERS) -DIDU_SEED=$(IDU_SEED) $(IDU_EXTRA)" >& idu_random_build.case.log
+
+
+# IFU iterations are the most expensive (an I-cache invalidate-all is 256 set
+# writes, a refill is tens to hundreds of cycles), hence the lower default.
+# IFU_ARENA_SEED reseeds the *code layout*, so a new value produces a different
+# program, not just different data.
+# IFU_ITERS is 200, and unlike the other three it is NOT calibrated to the 90 s
+# target. There is an unexplained runtime cliff between 200 and 400 iterations:
+# 200 completes in 0.594 ms of simulated time, 400 exceeds 15 ms and 1200
+# exceeds 20 ms -- with the core retiring throughout, so it is cost, not a hang.
+# See doc/specs/unit-random-tests.md Part IV "OPEN ISSUE" for what has been
+# ruled out and for the one-run diagnostic that would localise it.
+# Do not raise this without re-measuring.
+IFU_ITERS  ?= 200
+IFU_SEED       ?= 0x2024C906
+IFU_ARENA_SEED ?= 0x5A5AC906
+# IFU_ARENA_BASE must match the ADDRESS on the `.text.arena` output section in
+# tests/cases/ifu_random/linker_ifu.lcf -- an explicit output-section address,
+# NOT a `. = 0x8000;` assignment, which ld silently ignores for a section that
+# names a memory region. The generator computes every branch offset, I-cache set
+# index (VA[13:6]), BTB tag (PC[15:0]) and 4 KB page boundary from it, so a
+# mismatch would leave the test passing while covering nothing; the ASSERTs at
+# the bottom of that script turn it into a link error. Change both together, and
+# remember that .text.jit and .rodata are placed after the arena, so base + size
+# must stay below MEM1's 0x40000 top (0x8000 + 0x30000 = 0x38000 leaves 32 KB
+# for them).
+IFU_ARENA_BASE ?= 0x8000
+IFU_ARENA_SIZE ?= 0x30000
+IFU_OPT        ?= -O2
+IFU_EXTRA      ?=
+
+ifu_random_build:
+	@for f in $(RAND_COMMON_FILES); do cp $(RAND_COMMON)/$$f ./work; done
+	@cp ./tests/cases/ifu_random/C906_IFU_RANDOM.c ./work
+	@cp ./tests/cases/ifu_random/ifu_defs.h        ./work
+	@python3 ./tests/cases/ifu_random/gen_ifu_arena.py \
+	    --seed $(IFU_ARENA_SEED) \
+	    --arena-base $(IFU_ARENA_BASE) --arena-size $(IFU_ARENA_SIZE) \
+	    --out-s ./work/ifu_arena.S --out-h ./work/ifu_arena.h \
+	    --out-far-pat ./work/ifu_far.patgen --far-base 0x01000000 --check
+	@find ./tests/lib/ -maxdepth 1 -type f -exec cp {} ./work/ \;
+	@cp ./tests/cases/ifu_random/linker_ifu.lcf ./work/linker.lcf
+	@cd ./work && make -s clean && make -s all CPU_ARCH_FLAG_0=c906fd ENDIAN_MODE=little-endian CASENAME=ifu_random FILE=C906_IFU_RANDOM EXTRA_CFLAGS="-fno-optimize-sibling-calls -fno-jump-tables -Wa,-mno-relax $(IFU_OPT) -DIFU_ITERS=$(IFU_ITERS) -DIFU_SEED=$(IFU_SEED) $(IFU_EXTRA)" >& ifu_random_build.case.log
+	@mv ./work/ifu_far.patgen ./work/input.pat
+
+
 CSI_NN2_INSTALL := ../../csi-nn2/install_nn2/c906
 conv_softmax_build:
 	@cp ./tests/cases/conv_softmax/bare_main.c ./work
@@ -184,13 +328,50 @@ ifeq ($(CASE), debug)
 SIM_FILELIST := ../tests/cases/debug/JTAG_DRV.vh ../tests/cases/debug/C906_DEBUG_PATTERN.v
 endif
 
-# cp0_random pulls in the CP0 port-toggle monitor plus +define+CP0_TOGGLE_MON.
-# It goes through a filelist rather than SIMULATOR_DEF because the Makefile
+# Per-unit port-toggle monitors. Each randomized case pulls in its own unit's
+# monitor plus the matching +define+. MON=all overrides that and pulls in all
+# five, so that *any* case -- coremark, for the reference baseline -- can be
+# measured against every pipeline unit at once.
+#
+# These go through a filelist rather than SIMULATOR_DEF because the Makefile
 # assigns SIMULATOR_DEF with := per backend, after including this file.
 # (vcs / irun / verilator all accept options inside a -f filelist; iverilog
-# does not, so this case is vcs / nc / verilator only.)
+# does not, so every case below is vcs / nc / verilator only.)
+#
+# Consequence to remember: the guard is a compile-time define, so switching
+# CASE between any two of these five needs `make compile` again. runcase does
+# that for you; the fast loop is one `make compile` then repeated
+# `make buildcase` + `./simv` (which is what run_groups.sh does).
+ifeq ($(MON), all)
+SIM_FILELIST := -f ../logical/filelists/all_mon.f
+else
 ifeq ($(CASE), cp0_random)
 SIM_FILELIST := -f ../tests/cases/cp0_random/cp0_mon.f
+endif
+ifeq ($(CASE), iu_random)
+SIM_FILELIST := -f ../tests/cases/iu_random/iu_mon.f
+endif
+ifeq ($(CASE), vidu_random)
+SIM_FILELIST := -f ../tests/cases/vidu_random/vidu_mon.f
+endif
+ifeq ($(CASE), idu_random)
+SIM_FILELIST := -f ../tests/cases/idu_random/idu_mon.f
+endif
+ifeq ($(CASE), ifu_random)
+SIM_FILELIST := -f ../tests/cases/ifu_random/ifu_mon.f
+endif
+endif
+
+# iverilog cannot honour a +define+ inside a filelist (its -c command files take
+# filenames only), so fail loudly instead of with a confusing "module not
+# found" during elaboration.
+ifeq ($(SIM), iverilog)
+ifneq ($(filter $(CASE),cp0_random $(RAND_CASES)),)
+$(warning [THead-smart] CASE=$(CASE) is not supported under SIM=iverilog: its port-toggle monitor arrives via +define+ inside a -f filelist. Use SIM=vcs, SIM=nc or SIM=verilator.)
+endif
+ifeq ($(MON), all)
+$(warning [THead-smart] MON=all is not supported under SIM=iverilog for the same reason.)
+endif
 endif
 
 

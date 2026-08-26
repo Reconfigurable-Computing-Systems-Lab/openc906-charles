@@ -446,11 +446,42 @@ soc x_soc(
   .i_pad_rst_b         ( rst_b                )
 );
 
-// CP0 port-toggle monitor. Compiled in only when a case asks for it (the
-// cp0_random case does, via ../tests/cases/cp0_random/cp0_mon.f). Writes
-// work/cp0_toggle.report at $finish; see cli_tools/gen_cp0_toggle_mon.py.
+// Per-unit port-toggle monitors. Each is compiled in only when a case asks for
+// it, via ../tests/cases/<unit>_random/<unit>_mon.f, or when MON=all pulls in
+// ../logical/filelists/all_mon.f (which enables all five, so that any case --
+// coremark, for the reference baseline -- can be measured against every unit at
+// once). Each writes work/<unit>_toggle.report at $finish; regenerate with
+// cli_tools/gen_toggle_mon.py --unit <unit>.
 `ifdef CP0_TOGGLE_MON
 cp0_toggle_mon x_cp0_toggle_mon(
+  .clk                 ( clk                  ),
+  .rst_b               ( rst_b                )
+);
+`endif
+
+`ifdef IU_TOGGLE_MON
+iu_toggle_mon x_iu_toggle_mon(
+  .clk                 ( clk                  ),
+  .rst_b               ( rst_b                )
+);
+`endif
+
+`ifdef VIDU_TOGGLE_MON
+vidu_toggle_mon x_vidu_toggle_mon(
+  .clk                 ( clk                  ),
+  .rst_b               ( rst_b                )
+);
+`endif
+
+`ifdef IDU_TOGGLE_MON
+idu_toggle_mon x_idu_toggle_mon(
+  .clk                 ( clk                  ),
+  .rst_b               ( rst_b                )
+);
+`endif
+
+`ifdef IFU_TOGGLE_MON
+ifu_toggle_mon x_ifu_toggle_mon(
   .clk                 ( clk                  ),
   .rst_b               ( rst_b                )
 );

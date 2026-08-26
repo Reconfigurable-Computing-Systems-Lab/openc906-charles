@@ -1,0 +1,114 @@
+/* Linker script for ifu_random (copied over work/linker.lcf by the
+ * ifu_random_build recipe). Same regions as tests/lib/linker.lcf; the only
+ * addition is that the generated code arena is PINNED at an absolute address.
+ *
+ * Why it has to be pinned: gen_ifu_arena.py computes every branch offset, every
+ * I-cache set index (VA[13:6]), every BTB tag (PC[15:0]) and every 4 KB page
+ * boundary itself, and its --check pass asserts those invariants against
+ * --arena-base. If the linker were free to slide .text.arena, the 16 KB-stride
+ * set conflicts would stop conflicting, the 64 KB BTB alias pair would stop
+ * aliasing, and the test would still pass while covering nothing. Keeping the
+ * address in one place -- IFU_ARENA_BASE in setup/smart_cfg.mk, passed to both
+ * the generator and this script -- is what stops that.
+ *
+ * Both pinned sections live in ifu_arena.o, which is why one EXCLUDE_FILE
+ * clause is enough to keep the ordinary `*(.text*)` glob from swallowing them.
+ * Section-name globs cannot express the exclusion (`.text*` matches
+ * `.text.arena`), and reordering the output sections is not an option either:
+ * crt0.o must stay at 0x0 because that is the reset vector.
+ *
+ * The arena address is given as an explicit output-section address, NOT as a
+ * `. = 0x8000` assignment. An assignment to the location counter is IGNORED for
+ * an output section that names a memory region: ld places such a section at the
+ * region's next free address instead. That failure is silent -- the link
+ * succeeds, .text.arena lands wherever .text happened to end, and every
+ * address-derived coverage point in the test quietly stops working. The ASSERT
+ * at the bottom of this file is here so it can never be silent again.
+ *
+ * tests/lib/Makefile:117 already collects both pinned sections into inst.pat:
+ * its objcopy line is `-j .text* -j .rodata* -j .eh_frame*`, and the `.text*`
+ * glob matches .text.arena and .text.jit.
+ *
+ * MEM1 is 256 KB and inst.pat covers exactly that, so .text + .text.arena +
+ * .text.jit + .rodata must all fit below 0x40000. With the default
+ * IFU_ARENA_SIZE of 0x30000 the arena ends at 0x36000, .text.jit takes 4 KB,
+ * and the remainder is .rodata. gen_ifu_arena.py refuses an --arena-size that
+ * would run past MEM1.
+ */
+MEMORY
+{
+MEM1(RWX)  : ORIGIN = 0x00000000,  LENGTH = 0x40000
+MEM2(RWX)  : ORIGIN = 0x00040000,  LENGTH = 0xc0000
+}
+__kernel_stack = 0xee000 ;
+
+ENTRY(__start)
+
+SECTIONS {
+    .text :
+    {
+        crt0.o (.text)
+        *(EXCLUDE_FILE (*ifu_arena.o) .text*)
+    } >MEM1
+
+    /* IFU_ARENA_BASE. Must match setup/smart_cfg.mk and the --arena-base
+     * gen_ifu_arena.py was run with; the ASSERT below enforces it. */
+    .text.arena 0x00008000 :
+    {
+        *(.text.arena)
+    } >MEM1
+
+    .text.jit ALIGN(64) :
+    {
+        *(.text.jit)
+    } >MEM1
+
+    .rodata :  {   *( .rodata* )
+                   *(.srodata)
+                   *(.srodata.*)
+                   *(.srodata.cst4*)
+		   *(.srodata.cst8*)
+		  } >MEM1
+
+    .data :
+    {
+        *(.data*)
+        *(.sdata*)
+    } >MEM2
+    .bss :
+    {
+        *(.bss) *.(COMMON) *(.sbss)
+    } >MEM2
+    end = .;
+
+    /* tb.v loads input.pat TWICE: into the NN window at 0x0100_0000 (row
+     * 0x100000), which is what the 16 MB RAS-mispredict group needs, and into
+     * the legacy window at 0x8_0000 (tb.v:195-210, row 0x8000). That second
+     * copy happens at time 0 and overwrites whatever the image put there, so any
+     * .data or .bss object at or above 0x80000 would start life holding far-stub
+     * bytes instead of its initialiser or zero -- silently, and only for this
+     * case, because no other case ships both an input.pat and a large .bss.
+     *
+     * MEM2 is deliberately left at its stock 0xC0000 length rather than
+     * shortened, so a case that genuinely needs more than 256 KB of .bss can
+     * have it; this ASSERT is what makes the collision a link error instead of a
+     * corruption. If it ever fires, either shrink the offending array or shorten
+     * MEM2 to 0x40000 and accept the smaller .bss.
+     *
+     * The stack is unaffected: __kernel_stack is 0xEE000 and grows down through
+     * 0x80000, but nothing is pushed until long after the time-0 pat load. */
+    ASSERT(end <= 0x80000,
+           "ifu_random: .data + .bss reached 0x80000, where tb.v also loads input.pat -- see the note above this ASSERT")
+}
+
+/* The whole test is built on the arena being where the generator thinks it is.
+ * Turn a mis-pin into a hard link error rather than a run that passes while
+ * covering nothing: with .text.arena somewhere else, the 16 KB-strided blocks
+ * stop sharing an I-cache set, the 64 KB-separated pair stops aliasing in the
+ * BTB, and nothing anywhere says so. */
+ASSERT(ADDR(.text.arena) == 0x00008000,
+       "ifu_random: .text.arena is not pinned at IFU_ARENA_BASE (0x8000) -- the generated layout is invalid")
+ASSERT(ADDR(.text) + SIZEOF(.text) <= ADDR(.text.arena),
+       "ifu_random: .text has grown into the arena; raise IFU_ARENA_BASE in setup/smart_cfg.mk and regenerate")
+ASSERT(ADDR(.rodata) + SIZEOF(.rodata) <= 0x40000,
+       "ifu_random: .text + .text.arena + .text.jit + .rodata overflow MEM1 (256 KB, the inst.pat window)")
