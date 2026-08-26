@@ -2,7 +2,7 @@
 // AUTO-GENERATED -- do not edit by hand.
 //   generator : smart_run/cli_tools/gen_toggle_mon.py
 //   source    : ../C906_RTL_FACTORY/gen_rtl/cp0/rtl/aq_cp0_top.v
-//   ports     : 204 total (201 functional, 3 infrastructure)
+//   ports     : 204 total (178 functional, 3 infrastructure, 23 provably dead)
 //
 // Per-port toggle monitor. Reports, at $finish, how many bits of each
 // port of the probed instance ever changed value. Used to prove that a
@@ -2505,9 +2505,7 @@ final begin
   $fwrite(FH, "----------------------------------------------------------------------------\n");
   n_tog = 0;
   n_xseen = 0;
-  $fwrite(FH, "biu_cp0_coreid                     in      3 %0d %0d %0d\n", ones({125'b0, m0}), n0, x0);
-  if (|m0) n_tog = n_tog + 1;
-  if (x0 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "biu_cp0_coreid                     in      3 %0d %0d %0d   [dead]\n", ones({125'b0, m0}), n0, x0);
   $fwrite(FH, "biu_cp0_me_int                     in      1 %0d %0d %0d\n", ones({127'b0, m1}), n1, x1);
   if (|m1) n_tog = n_tog + 1;
   if (x1 != 0) n_xseen = n_xseen + 1;
@@ -2517,9 +2515,7 @@ final begin
   $fwrite(FH, "biu_cp0_mt_int                     in      1 %0d %0d %0d\n", ones({127'b0, m3}), n3, x3);
   if (|m3) n_tog = n_tog + 1;
   if (x3 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "biu_cp0_rvba                       in     40 %0d %0d %0d\n", ones({88'b0, m4}), n4, x4);
-  if (|m4) n_tog = n_tog + 1;
-  if (x4 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "biu_cp0_rvba                       in     40 %0d %0d %0d   [dead]\n", ones({88'b0, m4}), n4, x4);
   $fwrite(FH, "biu_cp0_se_int                     in      1 %0d %0d %0d\n", ones({127'b0, m5}), n5, x5);
   if (|m5) n_tog = n_tog + 1;
   if (x5 != 0) n_xseen = n_xseen + 1;
@@ -2673,27 +2669,13 @@ final begin
   $fwrite(FH, "rtu_cp0_tval                       in     64 %0d %0d %0d\n", ones({64'b0, m57}), n57, x57);
   if (|m57) n_tog = n_tog + 1;
   if (x57 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vl                         in      8 %0d %0d %0d\n", ones({120'b0, m58}), n58, x58);
-  if (|m58) n_tog = n_tog + 1;
-  if (x58 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vl_vld                     in      1 %0d %0d %0d\n", ones({127'b0, m59}), n59, x59);
-  if (|m59) n_tog = n_tog + 1;
-  if (x59 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vs_dirty_updt              in      1 %0d %0d %0d\n", ones({127'b0, m60}), n60, x60);
-  if (|m60) n_tog = n_tog + 1;
-  if (x60 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vs_dirty_updt_dp           in      1 %0d %0d %0d\n", ones({127'b0, m61}), n61, x61);
-  if (|m61) n_tog = n_tog + 1;
-  if (x61 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vstart                     in      7 %0d %0d %0d\n", ones({121'b0, m62}), n62, x62);
-  if (|m62) n_tog = n_tog + 1;
-  if (x62 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vstart_vld                 in      1 %0d %0d %0d\n", ones({127'b0, m63}), n63, x63);
-  if (|m63) n_tog = n_tog + 1;
-  if (x63 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "rtu_cp0_vxsat                      in      1 %0d %0d %0d\n", ones({127'b0, m64}), n64, x64);
-  if (|m64) n_tog = n_tog + 1;
-  if (x64 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "rtu_cp0_vl                         in      8 %0d %0d %0d   [dead]\n", ones({120'b0, m58}), n58, x58);
+  $fwrite(FH, "rtu_cp0_vl_vld                     in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m59}), n59, x59);
+  $fwrite(FH, "rtu_cp0_vs_dirty_updt              in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m60}), n60, x60);
+  $fwrite(FH, "rtu_cp0_vs_dirty_updt_dp           in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m61}), n61, x61);
+  $fwrite(FH, "rtu_cp0_vstart                     in      7 %0d %0d %0d   [dead]\n", ones({121'b0, m62}), n62, x62);
+  $fwrite(FH, "rtu_cp0_vstart_vld                 in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m63}), n63, x63);
+  $fwrite(FH, "rtu_cp0_vxsat                      in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m64}), n64, x64);
   $fwrite(FH, "rtu_cp0_vxsat_vld                  in      1 %0d %0d %0d\n", ones({127'b0, m65}), n65, x65);
   if (|m65) n_tog = n_tog + 1;
   if (x65 != 0) n_xseen = n_xseen + 1;
@@ -2715,9 +2697,7 @@ final begin
   $fwrite(FH, "sysio_cp0_apb_base                 in     40 %0d %0d %0d\n", ones({88'b0, m71}), n71, x71);
   if (|m71) n_tog = n_tog + 1;
   if (x71 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "vidu_cp0_vid_fof_vld               in      1 %0d %0d %0d\n", ones({127'b0, m72}), n72, x72);
-  if (|m72) n_tog = n_tog + 1;
-  if (x72 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "vidu_cp0_vid_fof_vld               in      1 %0d %0d %0d   [dead]\n", ones({127'b0, m72}), n72, x72);
   $fwrite(FH, "cp0_biu_icg_en                     out     1 %0d %0d %0d\n", ones({127'b0, m73}), n73, x73);
   if (|m73) n_tog = n_tog + 1;
   if (x73 != 0) n_xseen = n_xseen + 1;
@@ -2802,27 +2782,13 @@ final begin
   $fwrite(FH, "cp0_idu_ucme                       out     1 %0d %0d %0d\n", ones({127'b0, m100}), n100, x100);
   if (|m100) n_tog = n_tog + 1;
   if (x100 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vill                       out     1 %0d %0d %0d\n", ones({127'b0, m101}), n101, x101);
-  if (|m101) n_tog = n_tog + 1;
-  if (x101 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vl_zero                    out     1 %0d %0d %0d\n", ones({127'b0, m102}), n102, x102);
-  if (|m102) n_tog = n_tog + 1;
-  if (x102 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vlmul                      out     2 %0d %0d %0d\n", ones({126'b0, m103}), n103, x103);
-  if (|m103) n_tog = n_tog + 1;
-  if (x103 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vs                         out     2 %0d %0d %0d\n", ones({126'b0, m104}), n104, x104);
-  if (|m104) n_tog = n_tog + 1;
-  if (x104 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vsetvl_dis_stall           out     1 %0d %0d %0d\n", ones({127'b0, m105}), n105, x105);
-  if (|m105) n_tog = n_tog + 1;
-  if (x105 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vsew                       out     2 %0d %0d %0d\n", ones({126'b0, m106}), n106, x106);
-  if (|m106) n_tog = n_tog + 1;
-  if (x106 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_idu_vstart                     out     7 %0d %0d %0d\n", ones({121'b0, m107}), n107, x107);
-  if (|m107) n_tog = n_tog + 1;
-  if (x107 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_idu_vill                       out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m101}), n101, x101);
+  $fwrite(FH, "cp0_idu_vl_zero                    out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m102}), n102, x102);
+  $fwrite(FH, "cp0_idu_vlmul                      out     2 %0d %0d %0d   [dead]\n", ones({126'b0, m103}), n103, x103);
+  $fwrite(FH, "cp0_idu_vs                         out     2 %0d %0d %0d   [dead]\n", ones({126'b0, m104}), n104, x104);
+  $fwrite(FH, "cp0_idu_vsetvl_dis_stall           out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m105}), n105, x105);
+  $fwrite(FH, "cp0_idu_vsew                       out     2 %0d %0d %0d   [dead]\n", ones({126'b0, m106}), n106, x106);
+  $fwrite(FH, "cp0_idu_vstart                     out     7 %0d %0d %0d   [dead]\n", ones({121'b0, m107}), n107, x107);
   $fwrite(FH, "cp0_ifu_bht_en                     out     1 %0d %0d %0d\n", ones({127'b0, m108}), n108, x108);
   if (|m108) n_tog = n_tog + 1;
   if (x108 != 0) n_xseen = n_xseen + 1;
@@ -2910,9 +2876,7 @@ final begin
   $fwrite(FH, "cp0_lsu_dcache_wa                  out     1 %0d %0d %0d\n", ones({127'b0, m136}), n136, x136);
   if (|m136) n_tog = n_tog + 1;
   if (x136 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_lsu_dcache_wb                  out     1 %0d %0d %0d\n", ones({127'b0, m137}), n137, x137);
-  if (|m137) n_tog = n_tog + 1;
-  if (x137 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_lsu_dcache_wb                  out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m137}), n137, x137);
   $fwrite(FH, "cp0_lsu_fence_req                  out     1 %0d %0d %0d\n", ones({127'b0, m138}), n138, x138);
   if (|m138) n_tog = n_tog + 1;
   if (x138 != 0) n_xseen = n_xseen + 1;
@@ -2943,9 +2907,7 @@ final begin
   $fwrite(FH, "cp0_lsu_sync_req                   out     1 %0d %0d %0d\n", ones({127'b0, m147}), n147, x147);
   if (|m147) n_tog = n_tog + 1;
   if (x147 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_lsu_we_en                      out     1 %0d %0d %0d\n", ones({127'b0, m148}), n148, x148);
-  if (|m148) n_tog = n_tog + 1;
-  if (x148 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_lsu_we_en                      out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m148}), n148, x148);
   $fwrite(FH, "cp0_mmu_addr                       out    12 %0d %0d %0d\n", ones({116'b0, m149}), n149, x149);
   if (|m149) n_tog = n_tog + 1;
   if (x149 != 0) n_xseen = n_xseen + 1;
@@ -3054,12 +3016,8 @@ final begin
   $fwrite(FH, "cp0_rtu_ex1_inst_sret              out     1 %0d %0d %0d\n", ones({127'b0, m184}), n184, x184);
   if (|m184) n_tog = n_tog + 1;
   if (x184 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_rtu_ex1_vs_dirty               out     1 %0d %0d %0d\n", ones({127'b0, m185}), n185, x185);
-  if (|m185) n_tog = n_tog + 1;
-  if (x185 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_rtu_ex1_vs_dirty_dp            out     1 %0d %0d %0d\n", ones({127'b0, m186}), n186, x186);
-  if (|m186) n_tog = n_tog + 1;
-  if (x186 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_rtu_ex1_vs_dirty               out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m185}), n185, x185);
+  $fwrite(FH, "cp0_rtu_ex1_vs_dirty_dp            out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m186}), n186, x186);
   $fwrite(FH, "cp0_rtu_ex1_wb_data                out    64 %0d %0d %0d\n", ones({64'b0, m187}), n187, x187);
   if (|m187) n_tog = n_tog + 1;
   if (x187 != 0) n_xseen = n_xseen + 1;
@@ -3087,9 +3045,7 @@ final begin
   $fwrite(FH, "cp0_rtu_trap_pc                    out    40 %0d %0d %0d\n", ones({88'b0, m195}), n195, x195);
   if (|m195) n_tog = n_tog + 1;
   if (x195 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_rtu_vstart_eq_0                out     1 %0d %0d %0d\n", ones({127'b0, m196}), n196, x196);
-  if (|m196) n_tog = n_tog + 1;
-  if (x196 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_rtu_vstart_eq_0                out     1 %0d %0d %0d   [dead]\n", ones({127'b0, m196}), n196, x196);
   $fwrite(FH, "cp0_vpu_icg_en                     out     1 %0d %0d %0d\n", ones({127'b0, m197}), n197, x197);
   if (|m197) n_tog = n_tog + 1;
   if (x197 != 0) n_xseen = n_xseen + 1;
@@ -3102,9 +3058,7 @@ final begin
   $fwrite(FH, "cp0_vpu_xx_rm                      out     3 %0d %0d %0d\n", ones({125'b0, m200}), n200, x200);
   if (|m200) n_tog = n_tog + 1;
   if (x200 != 0) n_xseen = n_xseen + 1;
-  $fwrite(FH, "cp0_xx_mrvbr                       out    40 %0d %0d %0d\n", ones({88'b0, m201}), n201, x201);
-  if (|m201) n_tog = n_tog + 1;
-  if (x201 != 0) n_xseen = n_xseen + 1;
+  $fwrite(FH, "cp0_xx_mrvbr                       out    40 %0d %0d %0d   [dead]\n", ones({88'b0, m201}), n201, x201);
   $fwrite(FH, "cp0_yy_clk_en                      out     1 %0d %0d %0d\n", ones({127'b0, m202}), n202, x202);
   if (|m202) n_tog = n_tog + 1;
   if (x202 != 0) n_xseen = n_xseen + 1;
@@ -3112,14 +3066,37 @@ final begin
   if (|m203) n_tog = n_tog + 1;
   if (x203 != 0) n_xseen = n_xseen + 1;
 
-  $fwrite(FH, "\nSUMMARY: %0d/201 functional ports toggled (3 infrastructure ports excluded)\n", n_tog);
+  $fwrite(FH, "\nSUMMARY: %0d/178 functional ports toggled (3 infrastructure + 23 provably dead excluded)\n", n_tog);
+  $fwrite(FH, "EXCLUDED AS DEAD:");
+  $fwrite(FH, " biu_cp0_coreid");
+  $fwrite(FH, " biu_cp0_rvba");
+  $fwrite(FH, " rtu_cp0_vl");
+  $fwrite(FH, " rtu_cp0_vl_vld");
+  $fwrite(FH, " rtu_cp0_vs_dirty_updt");
+  $fwrite(FH, " rtu_cp0_vs_dirty_updt_dp");
+  $fwrite(FH, " rtu_cp0_vstart");
+  $fwrite(FH, " rtu_cp0_vstart_vld");
+  $fwrite(FH, " rtu_cp0_vxsat");
+  $fwrite(FH, " vidu_cp0_vid_fof_vld");
+  $fwrite(FH, " cp0_idu_vill");
+  $fwrite(FH, " cp0_idu_vl_zero");
+  $fwrite(FH, " cp0_idu_vlmul");
+  $fwrite(FH, " cp0_idu_vs");
+  $fwrite(FH, " cp0_idu_vsetvl_dis_stall");
+  $fwrite(FH, " cp0_idu_vsew");
+  $fwrite(FH, " cp0_idu_vstart");
+  $fwrite(FH, " cp0_lsu_dcache_wb");
+  $fwrite(FH, " cp0_lsu_we_en");
+  $fwrite(FH, " cp0_rtu_ex1_vs_dirty");
+  $fwrite(FH, " cp0_rtu_ex1_vs_dirty_dp");
+  $fwrite(FH, " cp0_rtu_vstart_eq_0");
+  $fwrite(FH, " cp0_xx_mrvbr");
+  $fwrite(FH, "\n");
   $fwrite(FH, "X-SEEN : %0d functional ports held an X/Z bit at some point\n", n_xseen);
   $fwrite(FH, "NEVER TOGGLED:");
-  if (~|m0) $fwrite(FH, " biu_cp0_coreid");
   if (~|m1) $fwrite(FH, " biu_cp0_me_int");
   if (~|m2) $fwrite(FH, " biu_cp0_ms_int");
   if (~|m3) $fwrite(FH, " biu_cp0_mt_int");
-  if (~|m4) $fwrite(FH, " biu_cp0_rvba");
   if (~|m5) $fwrite(FH, " biu_cp0_se_int");
   if (~|m6) $fwrite(FH, " biu_cp0_ss_int");
   if (~|m7) $fwrite(FH, " biu_cp0_st_int");
@@ -3170,13 +3147,6 @@ final begin
   if (~|m55) $fwrite(FH, " rtu_cp0_fs_dirty_updt");
   if (~|m56) $fwrite(FH, " rtu_cp0_fs_dirty_updt_dp");
   if (~|m57) $fwrite(FH, " rtu_cp0_tval");
-  if (~|m58) $fwrite(FH, " rtu_cp0_vl");
-  if (~|m59) $fwrite(FH, " rtu_cp0_vl_vld");
-  if (~|m60) $fwrite(FH, " rtu_cp0_vs_dirty_updt");
-  if (~|m61) $fwrite(FH, " rtu_cp0_vs_dirty_updt_dp");
-  if (~|m62) $fwrite(FH, " rtu_cp0_vstart");
-  if (~|m63) $fwrite(FH, " rtu_cp0_vstart_vld");
-  if (~|m64) $fwrite(FH, " rtu_cp0_vxsat");
   if (~|m65) $fwrite(FH, " rtu_cp0_vxsat_vld");
   if (~|m66) $fwrite(FH, " rtu_yy_xx_dbgon");
   if (~|m67) $fwrite(FH, " rtu_yy_xx_expt_int");
@@ -3184,7 +3154,6 @@ final begin
   if (~|m69) $fwrite(FH, " rtu_yy_xx_expt_vld");
   if (~|m70) $fwrite(FH, " rtu_yy_xx_flush");
   if (~|m71) $fwrite(FH, " sysio_cp0_apb_base");
-  if (~|m72) $fwrite(FH, " vidu_cp0_vid_fof_vld");
   if (~|m73) $fwrite(FH, " cp0_biu_icg_en");
   if (~|m74) $fwrite(FH, " cp0_biu_lpmd_b");
   if (~|m75) $fwrite(FH, " cp0_dtu_addr");
@@ -3213,13 +3182,6 @@ final begin
   if (~|m98) $fwrite(FH, " cp0_idu_icg_en");
   if (~|m99) $fwrite(FH, " cp0_idu_issue_stall");
   if (~|m100) $fwrite(FH, " cp0_idu_ucme");
-  if (~|m101) $fwrite(FH, " cp0_idu_vill");
-  if (~|m102) $fwrite(FH, " cp0_idu_vl_zero");
-  if (~|m103) $fwrite(FH, " cp0_idu_vlmul");
-  if (~|m104) $fwrite(FH, " cp0_idu_vs");
-  if (~|m105) $fwrite(FH, " cp0_idu_vsetvl_dis_stall");
-  if (~|m106) $fwrite(FH, " cp0_idu_vsew");
-  if (~|m107) $fwrite(FH, " cp0_idu_vstart");
   if (~|m108) $fwrite(FH, " cp0_ifu_bht_en");
   if (~|m109) $fwrite(FH, " cp0_ifu_bht_inv");
   if (~|m110) $fwrite(FH, " cp0_ifu_btb_clr");
@@ -3249,7 +3211,6 @@ final begin
   if (~|m134) $fwrite(FH, " cp0_lsu_dcache_read_type");
   if (~|m135) $fwrite(FH, " cp0_lsu_dcache_read_way");
   if (~|m136) $fwrite(FH, " cp0_lsu_dcache_wa");
-  if (~|m137) $fwrite(FH, " cp0_lsu_dcache_wb");
   if (~|m138) $fwrite(FH, " cp0_lsu_fence_req");
   if (~|m139) $fwrite(FH, " cp0_lsu_icc_addr");
   if (~|m140) $fwrite(FH, " cp0_lsu_icc_op");
@@ -3260,7 +3221,6 @@ final begin
   if (~|m145) $fwrite(FH, " cp0_lsu_mpp");
   if (~|m146) $fwrite(FH, " cp0_lsu_mprv");
   if (~|m147) $fwrite(FH, " cp0_lsu_sync_req");
-  if (~|m148) $fwrite(FH, " cp0_lsu_we_en");
   if (~|m149) $fwrite(FH, " cp0_mmu_addr");
   if (~|m150) $fwrite(FH, " cp0_mmu_icg_en");
   if (~|m151) $fwrite(FH, " cp0_mmu_lpmd_req");
@@ -3297,8 +3257,6 @@ final begin
   if (~|m182) $fwrite(FH, " cp0_rtu_ex1_inst_mret");
   if (~|m183) $fwrite(FH, " cp0_rtu_ex1_inst_split");
   if (~|m184) $fwrite(FH, " cp0_rtu_ex1_inst_sret");
-  if (~|m185) $fwrite(FH, " cp0_rtu_ex1_vs_dirty");
-  if (~|m186) $fwrite(FH, " cp0_rtu_ex1_vs_dirty_dp");
   if (~|m187) $fwrite(FH, " cp0_rtu_ex1_wb_data");
   if (~|m188) $fwrite(FH, " cp0_rtu_ex1_wb_dp");
   if (~|m189) $fwrite(FH, " cp0_rtu_ex1_wb_preg");
@@ -3308,17 +3266,15 @@ final begin
   if (~|m193) $fwrite(FH, " cp0_rtu_in_lpmd");
   if (~|m194) $fwrite(FH, " cp0_rtu_int_vld");
   if (~|m195) $fwrite(FH, " cp0_rtu_trap_pc");
-  if (~|m196) $fwrite(FH, " cp0_rtu_vstart_eq_0");
   if (~|m197) $fwrite(FH, " cp0_vpu_icg_en");
   if (~|m198) $fwrite(FH, " cp0_vpu_xx_bf16");
   if (~|m199) $fwrite(FH, " cp0_vpu_xx_dqnan");
   if (~|m200) $fwrite(FH, " cp0_vpu_xx_rm");
-  if (~|m201) $fwrite(FH, " cp0_xx_mrvbr");
   if (~|m202) $fwrite(FH, " cp0_yy_clk_en");
   if (~|m203) $fwrite(FH, " cp0_yy_priv_mode");
   $fwrite(FH, "\n");
   $fclose(FH);
-  $display("[cp0_toggle_mon] %0d/201 functional CP0 ports toggled; report in cp0_toggle.report", n_tog);
+  $display("[cp0_toggle_mon] %0d/178 functional CP0 ports toggled; report in cp0_toggle.report", n_tog);
 end
 
 endmodule

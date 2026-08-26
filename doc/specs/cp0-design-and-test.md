@@ -662,6 +662,23 @@ outputs (§13).
 forms never trap on a read-only CSR and never fire a write side effect. Only the
 `csrrw`/`csrrwi` forms, and set/clear with a non-zero source, can.
 
+**Known defect in group 2 — it does not currently test the path it documents.**
+What suppresses the write is `rs1` being **register `x0`**: the encoded register
+number, not the value the register happens to hold. The test's `CSR_RS`/`CSR_RC`
+macros take the operand through an `"r"` constraint, and
+`__asm__ ("csrrs %0, csr, %1" : "=r"(o) : "r"(0UL))` does *not* produce `x0` —
+GCC is free to materialise the zero in any register, and on this toolchain it
+picks `a4`, so the instruction performs a real write of 0. Group
+2 (`g_no_write_forms`) therefore writes to read-only CSRs and takes cause-2
+traps, exercising the opposite path from the one its comment describes. The run
+still passes because the handler absorbs cause 2, which is exactly why this was
+invisible. The `csrrsi`/`csrrci` cases in the same group are unaffected — a
+literal `0` immediate is encoded directly.
+
+The fix is a macro with `x0` written literally in the template
+(`"csrrs %0, " STR(csr) ", x0"`); verify with
+`riscv64-unknown-elf-gcc -S` that the emitted operand really is `zero`.
+
 **Reading MCPUID mutates it, but an illegal write does not.** §12's finding is
 correct for reads; the write side is qualified, because
 `iui_regs_csr_en = iui_inst_csr && !iui_csr_expt_vld` (`:775`). Since `0xFC0`
@@ -944,7 +961,7 @@ instead of diluting the rotation. `-DCP0_ONLY_GROUP=n` reaches any of them.
 | 38 | `mmu_tlb` | SMEH/SMEL/SMIR/SMCIR with all six ops (`invall` > `invasid` > `tlbp` > `tlbwi` > `tlbwr` > `tlbr`) plus the `mcir_no_op` leg; exercises the SMCIR stall until `mmu_cp0_cmplt` |
 | 39 | `satp` | random Sv39 `{mode, asid, ppn}` **in M mode only**, and a `satp` access from S under TVM |
 | 40 | `mprv` | `mstatus.MPRV` with `MPP` = M/S, plus SUM and MXR |
-| 41 | `float` | FFLAGS/FRM/FCSR/FXCR, a real FP op to dirty `mstatus.FS` and light up SD, and an `FS=0` pass where the float CSRs *and* every F/D instruction must trap |
+| 41 | `float` | FFLAGS/FRM/FCSR/FXCR, a real FP op to dirty `mstatus.FS` and light up SD, and an `FS=0` pass where the float CSRs *and* every F/D instruction must trap. |
 
 ---
 
@@ -1046,12 +1063,32 @@ port                               dir  width  bits_tog  tog_events
 cp0_ifu_bht_en                     out      1         1         412
 cp0_mmu_satp_data                  out     64        41        1907
 ...
-SUMMARY: NNN/201 functional ports toggled (3 infrastructure ports excluded)
+SUMMARY: NNN/178 functional ports toggled (3 infrastructure + 23 provably dead excluded)
+EXCLUDED AS DEAD: ...
 NEVER TOGGLED: ...
 ```
 
 Three ports are classed as infrastructure and excluded from the percentage:
-`cpurst_b`, `forever_cpuclk`, `pad_yy_icg_scan_en`. Note the classifier is
+`cpurst_b`, `forever_cpuclk`, `pad_yy_icg_scan_en`. A further 23 are classed as
+**provably dead** and also held out of the denominator — the 18 vector-path ports
+and the 5 hardwired tie-offs in the table below. The reasoning is that with them
+in, the percentage measures how much of the unit was configured out rather than
+how much of it the test reached: 90% of 201 requires 181 ports, but only 172 can
+ever move from bare-metal software, so the raw figure has a ceiling of 85.6% no
+matter what stimulus runs. The list lives in `DEAD` in
+`cli_tools/gen_toggle_mon.py`, keyed by `--unit` so one unit's exclusions cannot
+change another's, with the RTL line proving each entry constant. The generator
+errors out if a name in `DEAD` is not an actual port of the module, so the list
+cannot rot silently.
+
+The bar is a line of RTL making the signal structurally constant. "Hard to hit"
+does not qualify: the six JTAG-only ports and the three instruction-fetch-fault
+ports are deliberately **left in** the denominator, because both are reachable
+in principle — the first by the `debug` case, the second with a PMP execute-deny
+region or Sv39 page tables — and a test that cannot reach them should be scored
+as not reaching them.
+
+Note the classifier is
 deliberately *not* the aggressive substring match used by
 `cli_tools/extract_rc.py` — on this module that would also swallow
 `cp0_yy_clk_en` (the WFI clock enable, the single most important output to watch),
@@ -1086,6 +1123,96 @@ A non-empty `NEVER TOGGLED` list is expected. These are not coverage holes:
 
 ---
 
+## 22a. Line and branch coverage
+
+The toggle report proves the module's *ports* moved; it says nothing about how
+much of the logic inside ran. For that, Verilator's line coverage:
+
+```bash
+make compile CASE=cp0_random SIM=verilator COVERAGE=line
+make runcase CASE=cp0_random SIM=verilator COVERAGE=line CP0_ITERS=20000 COV_NAME=cp0
+make covreport SIM=verilator COV_ARGS="--units cp0 --top-cold 20 \
+    --exclude ../doc/results/random_tc_coverage/cp0_dead_points.json"
+```
+
+Measured, 20000 iterations, seed `0x2024C906`:
+
+| | raw | excluding dead points |
+|---|---|---|
+| line | 503/531 = **94.7%** | 503/518 = **97.1%** |
+| branch | 97/112 = **86.6%** | 91/100 = **91.0%** |
+
+For scale, the `coremark` reference measurement in
+`doc/results/random_tc_coverage/unit_coverage_baseline.json` reaches cp0 line
+278/531 (52.4%) and branch 68/112 — so `cp0_random` is worth **+42 points of
+line coverage** over a real workload on this unit.
+
+Two things to know before reading those numbers:
+
+- **Verilator `--coverage-line` does not instrument continuous assignments**,
+  and there is no Verilator equivalent of the VCS `-cm_line contassign` flag
+  that `smart_run/Makefile` calls load-bearing for this RTL. The 531 points are
+  procedural statements only. Every `assign` in the unit is invisible, which is
+  why `aq_cp0_top.v`, `aq_cp0_cache_inst.v` and `aq_cp0_vector_inst.v` — which
+  have no `always` blocks at all — contribute nothing. Verilator and VCS cp0
+  percentages are therefore not comparable; say which one a number came from.
+- The exclusion file `doc/results/random_tc_coverage/cp0_dead_points.json`
+  carries a `why` per entry with the RTL line proving the point unreachable.
+  Line numbers move if the RTL is edited — re-derive with `--top-cold`.
+
+### What is left uncovered
+
+Everything still cold after the above, by category:
+
+| Points | Where | Status |
+|---|---|---|
+| 5 | `aq_cp0_float_csr.v:412-418` | dead — the `iui_vsetvl_bypass` arm of the `cp0_idu_v*` muxes; `aq_cp0_top.v:1048` ties `iui_inst_vsetvl_decd` to 0 |
+| 5 | `aq_cp0_rst_ctrl.v` `default:` legs ×5 | dead — 2-bit FSMs, `2'b11` never assigned |
+| 4 | `aq_cp0_lpmd.v:152`, `aq_cp0_fence_inst.v:190`, `aq_cp0_hpcp_csr.v:259`, `aq_cp0_info_csr.v:194` | dead — same argument, or a full-case `default` |
+| 3 | `aq_cp0_trap_csr.v:605, 788, 790` | dead — debug-mode entry, and `vec_num` 16/18 with `mcip`/`mhip` tied to 0 |
+| 1 | `aq_cp0_ext_csr.v:1108` | dead — the L2 leg of the MCDATA mux; `biu_cp0_l2_read_data_vld = 1'b0` (`:1088`) |
+| 6 | `aq_cp0_trap_csr.v:785-787`, `aq_cp0_iui.v:658, 660, 688` | **real gap** — `vec_num` 12/13/15 and the fetch-fault vectors. Needs a PMP execute-deny region or Sv39 page tables; both break the §20 rails, so out of scope for this test |
+| 4 | `aq_cp0_lpmd.v:144, 195`, `aq_cp0_fence_inst.v:166`, `aq_cp0_rst_ctrl.v:377` | **real gap** — timing corners: staying in a wait state rather than passing straight through it |
+| 4 | `aq_cp0_regs.v:1262, 1774, 1775, 1781`; `aq_cp0_ext_csr.v:576` | **real gap, cheap to close** — the S-mode HPCP shadows. `SCNTINTEN`/`SCNTOF` and the `SCNTIHBT`/`SHPMCR`/`SHPMSP`/`SHPMEP` group are never named by any group, and `:576` needs an actual *write* to `SHPMCR`. All are legal from M mode. A read of each address plus one `SHPMCR` write covers them. |
+| 1 | `aq_cp0_trap_csr.v:643` | **real gap, cheap to close** — `regs_mpp_write_ill` forces `mpp` back to `2'b00` when a write presents the reserved `MPP == 2'b10` (`:633`). Every group writes MPP through a mask that can only produce 00, 01 or 11. |
+
+So the residual is 18 dead points, 6 needing address-translation stimulus, 4
+timing corners, and 5 that a few extra CSR accesses would close. There is no
+large block of unexercised CP0 logic left.
+
+### Two notes for whoever closes the remaining gaps
+
+The `lpmd:144`/`:195` corners need a wake that arrives *after* the WFI issues,
+which rules out `arm_lpmd_wake()` — with that source already pending, `lpmd_ack`
+is true on the first cycle in `WAIT` and the FSM passes straight to `LPMD`. The
+CLINT timer works instead, and can be armed safely: set `mie.MTIE` but leave
+`mstatus.MIE` **clear**, which satisfies `lpmd_ack_vld = |(mie & mip)` (blind to
+both privilege and `MIE`) without the interrupt ever being taken. That second
+half is not optional — `mtip` is a live CLINT pin with no software-writable
+`mip` bit, so an `mtip` taken as a trap re-traps forever. Dropping the pre-armed
+backstop is safe here only because the wake cannot be lost: `mtime` is
+`pad_cpu_sys_cnt`, one tick per CPU clock on a clock that is not gated by the
+core's low-power state (`clint_top.v:44`). Measured working over 3000 iterations
+of group 21 in isolation.
+
+**Beware of wall-clock measurements on a laptop.** An implementation of all of
+the above was written, compiled and passed at 3000 iterations, but was reverted
+unvalidated after 20000-iteration runs appeared to blow out from ~400 s to over
+an hour. That conclusion was wrong: re-running the *unmodified* test at the end
+of the same session reproduced the same slowdown, so the cause was sustained-load
+throttling of the host after hours of continuous simulation, not the new
+stimulus. If you are timing this test on an Apple-silicon laptop, take the
+reference measurement on a cool machine, and re-measure the baseline alongside
+any change rather than comparing against a number from earlier in the day.
+
+Two cost facts are still worth respecting, independent of that: whole-cache
+maintenance (`th.dcache.*`, MCOR CLR/INV) is the most expensive thing this test
+can issue per instruction, so keep it to one per group hit; and the HPCP-routed
+counter reads stall the CSR pipe until `hpcp_cp0_data` returns, so sweep a slice
+of a 32-entry counter window per hit rather than the whole thing.
+
+---
+
 ## 23. Baseline results
 
 Verilator 5.048 on macOS (arm64), default seed `0x2024C906`, `CP0_ITERS=100000`,
@@ -1106,7 +1233,11 @@ is needed. VCS will be substantially faster.
 
 The full per-port report from that run is committed as
 `doc/results/cp0_toggle_baseline.report` — diff a new run against it to see what
-an RTL change moved.
+an RTL change moved. **That committed file predates the dead-port exclusion list
+of §22**, so its summary line still reads `169/201` and it has no
+`EXCLUDED AS DEAD` line; the set of ports that toggled is unchanged, only the
+denominator moved (169/178 = 94.9%). Regenerate it from a fresh 100000-iteration
+run when convenient.
 
 All 42 groups also pass individually
 (`bash tests/cases/cp0_random/run_groups.sh`), which is the check to run first if

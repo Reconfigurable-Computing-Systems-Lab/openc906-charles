@@ -122,12 +122,51 @@ def unit_of(path, units):
     return None
 
 
-def tally(points, units, types):
-    """-> (per_unit, per_file) tallies of [covered, total] per type."""
+def load_excludes(path):
+    """Read an exclusion JSON -> {short_path: set(line numbers)}.
+
+    Shape: {"<file>": {"lines": [..], "why": "..."}}, where <file> is matched
+    against the tail of the source path the way short_path() prints it. The
+    "why" text is not used here; it exists so the file is self-documenting and
+    an entry cannot be added without saying which line of RTL proves the point
+    is unreachable.
+    """
+    import json
+    with open(path) as fh:
+        raw = json.load(fh)
+    out = {}
+    for f, spec in raw.items():
+        if f.startswith("_"):        # allow "_comment" keys
+            continue
+        out[f] = set(str(n) for n in spec.get("lines", []))
+    return out
+
+
+def is_excluded(fname, lineno, excludes):
+    if not excludes:
+        return False
+    norm = fname.replace("\\", "/")
+    for f, lines in excludes.items():
+        if norm.endswith(f) and lineno in lines:
+            return True
+    return False
+
+
+def tally(points, units, types, excludes=None):
+    """-> (per_unit, per_file) tallies of [covered, total] per type.
+
+    Points named in `excludes` are dropped from both numerator and denominator.
+    Only ever used to remove points that are unreachable in this RTL
+    configuration -- see the exclusion file for the per-entry justification.
+    """
     per_unit = {}
     per_file = {}
+    n_excl = 0
     for (ctype, fname, lineno, col, comment), (count, module) in points.items():
         if ctype not in types:
+            continue
+        if is_excluded(fname, lineno, excludes):
+            n_excl += 1
             continue
         u = unit_of(fname, units) or "other"
         per_unit.setdefault(u, {}).setdefault(ctype, [0, 0])
@@ -144,6 +183,8 @@ def tally(points, units, types):
                 fcell[0] += 1
             else:
                 per_file[key].setdefault("_cold_lines", []).append(lineno)
+    if n_excl:
+        sys.stderr.write("excluded %d unreachable point(s)\n" % n_excl)
     return per_unit, per_file
 
 
@@ -297,12 +338,22 @@ def main():
     ap.add_argument("--fail-on-regress", action="store_true",
                     help="exit 1 if any (unit,type) covered count dropped "
                          "versus --baseline")
+    ap.add_argument("--exclude", metavar="FILE",
+                    help="JSON of coverage points that are unreachable in "
+                         "this RTL configuration; dropped from both numerator "
+                         "and denominator. Every entry carries a 'why' with "
+                         "the RTL line proving it. See "
+                         "doc/results/random_tc_coverage/cp0_dead_points.json")
     ap.add_argument("--top-cold", type=int, default=0, metavar="N")
     a = ap.parse_args()
 
     types = [t.strip() for t in a.types.split(",") if t.strip()]
+    excludes = load_excludes(a.exclude) if a.exclude else None
 
     if a.urg:
+        if excludes:
+            sys.exit("--exclude works on Verilator .dat input only: the urg "
+                     "parser reports per module, not per source line")
         per_unit, per_file = parse_urg(a.urg, a.units, types)
         sources = [a.urg]
     else:
@@ -325,7 +376,7 @@ def main():
             sys.exit("parsed %d files but found no coverage points -- check the "
                      "file format with: head -3 %s | cat -v"
                      % (len(files), files[0]))
-        per_unit, per_file = tally(points, a.units, types)
+        per_unit, per_file = tally(points, a.units, types, excludes)
         sources = ["%s (%d points, %d unique)"
                    % (" ".join(os.path.basename(f) for f in files),
                       npoints, len(points))]

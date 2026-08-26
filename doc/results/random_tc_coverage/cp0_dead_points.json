@@ -1,0 +1,69 @@
+{
+  "_comment": [
+    "Coverage points in gen_rtl/cp0/rtl that CANNOT be reached in this RTL",
+    "configuration, no matter what stimulus runs. Consumed by",
+    "smart_run/cli_tools/cov_report.py --exclude; points listed here are",
+    "dropped from both numerator and denominator.",
+    "",
+    "The bar for an entry is a line of RTL that makes the point structurally",
+    "unreachable -- a constant, a tie-off, or a case default on a state value",
+    "that is never assigned. 'Hard to hit' is NOT sufficient and does not",
+    "belong here. Two categories were deliberately LEFT OUT so they keep",
+    "counting against the score:",
+    "  - instruction-fetch and page faults (aq_cp0_trap_csr.v:785-787 vec_num",
+    "    12/13/15, aq_cp0_iui.v:658/660/688). Reachable from software with a",
+    "    PMP execute-deny region or Sv39 page tables. A real coverage gap.",
+    "  - the WFI/fence timing corners (aq_cp0_lpmd.v:144, :195,",
+    "    aq_cp0_fence_inst.v:166, aq_cp0_rst_ctrl.v:377). Reachable; the",
+    "    late-wake WFI sub-case in g_wfi targets the first two.",
+    "",
+    "Line numbers are Verilator --coverage-line point locations and will move",
+    "if the RTL is edited. Re-derive with:",
+    "  make covreport SIM=verilator COV_ARGS='--units cp0 --top-cold 20'"
+  ],
+
+  "gen_rtl/cp0/rtl/aq_cp0_float_csr.v": {
+    "lines": [412, 413, 416, 417, 418],
+    "why": "The iui_vsetvl_bypass arm of the five cp0_idu_v* output muxes. iui_vsetvl_bypass = idu_cp0_ex1_gateclk_sel && iui_inst_vsetvl_decd (aq_cp0_iui.v:447), and aq_cp0_top.v:1048 ties iui_inst_vsetvl_decd to 1'b0, so the bypass arm is never selected. The constants it would otherwise lose to are themselves hardwired: vstart_vstart = 7'b0 (:316), fcsr_vxsat = 1'b0 (:327), vtype_vill = 1'b1 / vsew = 0 / vlmul = 0 (:350-352). misa.V is 0 (aq_cp0_info_csr.v:150) and aq_cp0_vector_inst.v is a 62-line stub, so there is no vector path in this release."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_iui.v": {
+    "lines": [445],
+    "why": "iui_vsetvl_data, only consumed under iui_vsetvl_bypass, which is tied off as above."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_rst_ctrl.v": {
+    "lines": [236, 328, 382, 434, 506],
+    "why": "The default: leg of the five near-identical invalidation FSMs (rst_cache_inv, icache, bht, dcache, mmu). cur_state is 2 bits with RST_IDLE/RST_WFC/RST_DONE (:201-203); 2'b11 is never assigned anywhere, so no default leg can be entered. Note :377 (RST_DONE -> RST_IDLE on op_done in the BHT FSM) is NOT here: that state is reachable."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_lpmd.v": {
+    "lines": [152],
+    "why": "default: next_state = IDLE. Same argument: cur_state is 2 bits over IDLE/WAIT/LPMD (:115-117) and 2'b11 is never assigned."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_fence_inst.v": {
+    "lines": [190],
+    "why": "default: leg of the fence FSM. States 3'b110 and 3'b111 are never assigned; the six live states are FNC_IDLE/FENC/CDCA/CMMU/IICA/CMPLT."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_hpcp_csr.v": {
+    "lines": [259],
+    "why": "default: cnt_sel = 32'hx on a case over iui_regs_imm[4:0]. All 32 values of a 5-bit selector are enumerated at :227-258, so the default is unreachable by construction."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_info_csr.v": {
+    "lines": [194],
+    "why": "default: leg of the mcpuid index case. index is bounded to 0..6 by the wrap at :161-163, so the 3-bit value 7 never appears."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_trap_csr.v": {
+    "lines": [605, 788, 790],
+    "why": ":605 -- pm_wdata = dtu_cp0_dcsr_prv, gated on rtu_cp0_exit_debug, i.e. leaving debug mode. Needs a JTAG debugger attached; the separate `debug` case drives it, and cp0_random deliberately never writes TDATA1 because an mcontrol trigger halts a debugger-less core with no way back. :788 and :790 -- vec_num legs for interrupt causes 16 and 18, but mhip = 1'b0 (:1226) and mcip = 1'b0 (:1228), and RTU never issues an exception vector above 15."
+  },
+
+  "gen_rtl/cp0/rtl/aq_cp0_ext_csr.v": {
+    "lines": [1108],
+    "why": "cdata_read_data = biu_cp0_l2_read_data, selected by 3'b100 = {l2_vld, dcache_vld, icache_vld}. biu_cp0_l2_read_data_vld = 1'b0 (:1088) and biu_cp0_l2_read_data = 128'b0 (:1090) -- there is no L2 cache in this core, so the MCINDEX RAM-inspection window can never return an L2 line."
+  }
+}

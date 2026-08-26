@@ -86,6 +86,58 @@ INFRA_RE = re.compile(
     r"|[A-Za-z0-9_]*scan_en"        # pad_yy_icg_scan_en
     r")$", re.IGNORECASE)
 
+# Ports that CANNOT toggle in this RTL release, no matter what stimulus runs.
+# These are counted and printed like any other port but are held out of the
+# SUMMARY denominator, because leaving them in makes the percentage a measure
+# of how much of the unit was configured out rather than of how much of it the
+# test reached. Every entry needs a line of RTL proving the signal is a
+# constant -- a port that is merely *hard* to toggle does not belong here.
+#
+# Listed per unit and keyed by --unit, so adding a unit's dead list cannot
+# change any other unit's number. Only cp0 has been audited so far.
+DEAD = {
+    # ---- CP0: the vector path -----------------------------------------
+    # misa.V is 0 (aq_cp0_info_csr.v:150) and aq_cp0_vector_inst.v is a stub,
+    # so RTU/VIDU never issue a vector update and the five cp0_idu_v* outputs
+    # are stuck on their constant arm: iui_vsetvl_bypass = gateclk_sel &&
+    # iui_inst_vsetvl_decd (aq_cp0_iui.v:447) and aq_cp0_top.v:1048 ties
+    # iui_inst_vsetvl_decd to 1'b0. The constants it selects instead are
+    # themselves hardwired -- vstart_vstart = 7'b0 (aq_cp0_float_csr.v:316),
+    # fcsr_vxsat = 1'b0 (:327), vtype_vill = 1'b1 / vsew = 0 / vlmul = 0
+    # (:350-352) -- which also makes regs_vstart_eq_0 (:318) a constant 1.
+    "cp0": {
+        "rtu_cp0_vl", "rtu_cp0_vl_vld",
+        "rtu_cp0_vstart", "rtu_cp0_vstart_vld",
+        "rtu_cp0_vxsat",
+        "rtu_cp0_vs_dirty_updt", "rtu_cp0_vs_dirty_updt_dp",
+        "vidu_cp0_vid_fof_vld",
+        "cp0_idu_vill", "cp0_idu_vl_zero", "cp0_idu_vlmul",
+        "cp0_idu_vs", "cp0_idu_vsew", "cp0_idu_vstart",
+        "cp0_idu_vsetvl_dis_stall",
+        "cp0_rtu_ex1_vs_dirty", "cp0_rtu_ex1_vs_dirty_dp",
+        "cp0_rtu_vstart_eq_0",
+        # ---- CP0: hardwired tie-offs ----------------------------------
+        # cp0_lsu_we_en = 1'b0 (aq_cp0_ext_csr.v:1225); cp0_lsu_dcache_wb = wb
+        # and wb = 1'b1 (:694, :1223); cp0_xx_mrvbr = mrvbr_reg =
+        # biu_cp0_rvba (:953, :1171) and no mrvbr_local_en exists anywhere in
+        # the unit, so MRVBR writes are dropped and the port just mirrors an
+        # SoC-level constant. biu_cp0_coreid and biu_cp0_rvba are that
+        # constant, driven from outside the core.
+        "biu_cp0_coreid", "biu_cp0_rvba", "cp0_xx_mrvbr",
+        "cp0_lsu_we_en", "cp0_lsu_dcache_wb",
+    },
+}
+
+# Deliberately NOT in DEAD, so they keep counting against us:
+#   rtu_yy_xx_dbgon, rtu_cp0_exit_debug, dtu_cp0_wake_up,
+#   dtu_cp0_dcsr_prv, dtu_cp0_dcsr_mprven, cp0_rtu_ex1_inst_dret
+#     -- reachable, but only with a JTAG debugger attached; the `debug` case
+#        drives them. Not dead, just out of a bare-metal test's reach.
+#   idu_cp0_ex1_expt_acc_error, idu_cp0_ex1_expt_page_fault,
+#   idu_cp0_ex1_expt_high
+#     -- instruction-fetch faults. Reachable from software with a PMP
+#        execute-deny region or Sv39 page tables; a genuine coverage gap.
+
 # The one place the testbench hierarchy is written down.
 CORE = ("tb.x_soc.x_cpu_sub_system_axi.x_c906_wrapper.x_cpu_top"
         ".x_aq_top_0.x_aq_core")
@@ -129,10 +181,13 @@ def parse_ports(path):
     return ports
 
 
-def emit(ports, inst, module, guard, report, rtl, prefix):
+def emit(ports, inst, module, guard, report, rtl, prefix, dead=frozenset()):
     max_w = max(p[2] for p in ports)
     infra = [p for p in ports if INFRA_RE.search(p[0])]
-    func = [p for p in ports if not INFRA_RE.search(p[0])]
+    live = [p for p in ports
+            if not INFRA_RE.search(p[0]) and p[0] not in dead]
+    gone = [p for p in ports
+            if not INFRA_RE.search(p[0]) and p[0] in dead]
     mac = "%s_MON_I" % prefix
 
     o = []
@@ -142,8 +197,8 @@ def emit(ports, inst, module, guard, report, rtl, prefix):
     w("// AUTO-GENERATED -- do not edit by hand.")
     w("//   generator : smart_run/cli_tools/gen_toggle_mon.py")
     w("//   source    : %s" % rtl)
-    w("//   ports     : %d total (%d functional, %d infrastructure)"
-      % (len(ports), len(func), len(infra)))
+    w("//   ports     : %d total (%d functional, %d infrastructure, "
+      "%d provably dead)" % (len(ports), len(live), len(infra), len(gone)))
     w("//")
     w("// Per-port toggle monitor. Reports, at $finish, how many bits of each")
     w("// port of the probed instance ever changed value. Used to prove that a")
@@ -226,7 +281,12 @@ def emit(ports, inst, module, guard, report, rtl, prefix):
     for i, (name, d, width, msb, lsb) in enumerate(ports):
         tag = "in " if d == "input" else "out"
         pad = name.ljust(NAME_COL)
-        note = "   [infra]" if INFRA_RE.search(name) else ""
+        if INFRA_RE.search(name):
+            note = "   [infra]"
+        elif name in dead:
+            note = "   [dead]"
+        else:
+            note = ""
         # Width is known now, so bake it into the literal; only the runtime
         # counters stay as %0d. ones() takes the widest port width, so
         # zero-extend narrower ports before passing the mask in.
@@ -234,23 +294,29 @@ def emit(ports, inst, module, guard, report, rtl, prefix):
         head = "%s %s %5s" % (pad, tag, width)
         w('  $fwrite(FH, "' + head + ' %0d %0d %0d' + note + '\\n"'
           + ', ones({' + ext + 'm%d}), n%d, x%d);' % (i, i, i))
-        if not INFRA_RE.search(name):
+        if not INFRA_RE.search(name) and name not in dead:
             w("  if (|m%d) n_tog = n_tog + 1;" % i)
             w("  if (x%d != 0) n_xseen = n_xseen + 1;" % i)
     w("")
     w('  $fwrite(FH, "\\nSUMMARY: %%0d/%d functional ports toggled '
-      '(%d infrastructure ports excluded)\\n", n_tog);' % (len(func), len(infra)))
+      '(%d infrastructure + %d provably dead excluded)\\n", n_tog);'
+      % (len(live), len(infra), len(gone)))
+    if gone:
+        w('  $fwrite(FH, "EXCLUDED AS DEAD:");')
+        for name, d, width, msb, lsb in gone:
+            w('  $fwrite(FH, " %s");' % name)
+        w('  $fwrite(FH, "\\n");')
     w('  $fwrite(FH, "X-SEEN : %0d functional ports held an X/Z bit at some '
       'point\\n", n_xseen);')
     w('  $fwrite(FH, "NEVER TOGGLED:");')
     for i, (name, d, width, msb, lsb) in enumerate(ports):
-        if INFRA_RE.search(name):
+        if INFRA_RE.search(name) or name in dead:
             continue
         w('  if (~|m%d) $fwrite(FH, " %s");' % (i, name))
     w('  $fwrite(FH, "\\n");')
     w("  $fclose(FH);")
     w('  $display("[%s] %%0d/%d functional %s ports toggled; '
-      'report in %s", n_tog);' % (module, len(func), prefix, report))
+      'report in %s", n_tog);' % (module, len(live), prefix, report))
     w("end")
     w("")
     w("endmodule")
@@ -310,15 +376,25 @@ def main():
     if not ports:
         sys.exit("no input/output declarations found in %s" % a.rtl)
 
-    text = emit(ports, a.inst, a.module, a.define, a.report, a.rtl, prefix)
+    # Dead lists are per unit, so explicit-flag mode gets none -- there is no
+    # unit name to key on and silently applying cp0's would be wrong.
+    dead = DEAD.get(a.unit or "", frozenset())
+    unknown = dead - {p[0] for p in ports}
+    if unknown:
+        sys.exit("DEAD[%s] names ports absent from %s: %s"
+                 % (a.unit, a.rtl, " ".join(sorted(unknown))))
+
+    text = emit(ports, a.inst, a.module, a.define, a.report, a.rtl, prefix,
+                dead)
     with open(a.out, "w") as fh:
         fh.write(text)
 
     infra = sum(1 for p in ports if INFRA_RE.search(p[0]))
     sys.stderr.write(
-        "%s: %d ports (%d functional, %d infrastructure), widest %d bits -> %s\n"
-        % (a.rtl, len(ports), len(ports) - infra, infra,
-           max(p[2] for p in ports), a.out))
+        "%s: %d ports (%d functional, %d infrastructure, %d dead), "
+        "widest %d bits -> %s\n"
+        % (a.rtl, len(ports), len(ports) - infra - len(dead), infra,
+           len(dead), max(p[2] for p in ports), a.out))
 
 
 if __name__ == "__main__":
