@@ -1,0 +1,8 @@
+// Extra compile options + files for the idu_random case.
+// Pulled in via SIM_FILELIST from setup/smart_cfg.mk. Paths are relative to
+// smart_run/work, which is the cwd of every simulator invocation.
+//
+// Enabling IDU_TOGGLE_MON both compiles the monitor module (the whole file is
+// inside the `ifdef) and makes tb.v instantiate it.
++define+IDU_TOGGLE_MON
+../tests/cases/idu_random/idu_toggle_mon.v

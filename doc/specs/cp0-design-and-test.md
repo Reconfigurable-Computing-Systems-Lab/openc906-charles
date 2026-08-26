@@ -840,7 +840,7 @@ against `3=38` ebreak traps, so every bail was accounted for.
 | `tests/cases/cp0_random/cp0_toggle_mon.v` | **generated** port-toggle monitor |
 | `tests/cases/cp0_random/cp0_mon.f` | filelist adding the monitor + `+define+CP0_TOGGLE_MON` |
 | `tests/cases/cp0_random/run_groups.sh` | per-group bisect harness |
-| `cli_tools/gen_cp0_toggle_mon.py` | regenerates the monitor from `aq_cp0_top.v` |
+| `cli_tools/gen_toggle_mon.py` | regenerates the monitor from `aq_cp0_top.v` (`--unit cp0`); shared with the four per-unit stress tests |
 
 Plus three small hooks outside the case directory:
 
@@ -1061,10 +1061,17 @@ are functional.
 Regenerate the monitor after any change to `aq_cp0_top`'s ports:
 
 ```bash
-python3 cli_tools/gen_cp0_toggle_mon.py \
-    --rtl ../C906_RTL_FACTORY/gen_rtl/cp0/rtl/aq_cp0_top.v \
+python3 cli_tools/gen_toggle_mon.py --unit cp0 \
     --out tests/cases/cp0_random/cp0_toggle_mon.v
 ```
+
+The generator is shared with the four per-unit stress tests
+(`doc/specs/unit-random-tests.md`); `--unit` fills in the RTL path, the instance
+path, the module name, the guard macro and the report filename. It also emits a
+per-port `x_cycles` column, which exists because the accumulate guard is
+whole-port: under a 4-state simulator one permanently-X bit records zero toggles
+for the whole port, so Verilator and VCS toggle numbers are not comparable and
+the column is what makes that visible rather than mysterious.
 
 ### Ports that will never toggle, and why
 

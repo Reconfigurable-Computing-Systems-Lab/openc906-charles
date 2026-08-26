@@ -1,0 +1,60 @@
+VIDU port toggle report -- instance:
+  tb.x_soc.x_cpu_sub_system_axi.x_c906_wrapper.x_cpu_top.x_aq_top_0.x_aq_core.x_aq_vidu_top
+
+port                               dir  width  bits_tog  tog_events  x_cycles
+----------------------------------------------------------------------------
+cp0_idu_icg_en                     in      1 0 0 0
+cp0_yy_clk_en                      in      1 1 1 0
+cpurst_b                           in      1 1 2 0   [infra]
+forever_cpuclk                     in      1 0 0 0   [infra]
+idu_vidu_ex1_fp_dp_sel             in      1 1 50 0
+idu_vidu_ex1_fp_gateclk_sel        in      1 1 42 0
+idu_vidu_ex1_fp_sel                in      1 1 50 0
+idu_vidu_ex1_inst_data             in    180 133 666798 0
+idu_vidu_ex1_vec_dp_sel            in      1 0 0 0
+idu_vidu_ex1_vec_gateclk_sel       in      1 0 0 0
+idu_vidu_ex1_vec_sel               in      1 0 0 0
+ifu_vidu_warm_up                   in      1 1 2 0
+pad_yy_icg_scan_en                 in      1 0 0 0   [infra]
+rtu_vidu_flush_wbt                 in      1 1 1362 0
+rtu_yy_xx_async_flush              in      1 0 0 0
+vpu_vidu_fp_fwd_data               in     64 64 32 0
+vpu_vidu_fp_fwd_reg                in      5 4 32 0
+vpu_vidu_fp_fwd_vld                in      1 1 36 0
+vpu_vidu_fp_wb_data                in     64 64 17 0
+vpu_vidu_fp_wb_reg                 in      5 4 18 0
+vpu_vidu_fp_wb_vld                 in      1 1 36 0
+vpu_vidu_vex1_fp_stall             in      1 0 0 0
+vpu_vidu_wbt_fp_wb0_reg            in      5 4 18 0
+vpu_vidu_wbt_fp_wb0_vld            in      1 1 18 0
+vpu_vidu_wbt_fp_wb1_reg            in      5 5 122846 0
+vpu_vidu_wbt_fp_wb1_vld            in      1 1 18 0
+vidu_cp0_vid_fof_vld               out     1 0 0 0
+vidu_dtu_debug_info                out     8 2 40 0
+vidu_idu_fp_full                   out     1 1 22 0
+vidu_idu_vec_full                  out     1 0 0 0
+vidu_rtu_no_op                     out     1 1 22 0
+vidu_vpu_vid_fp_inst_dp_vld        out     1 1 40 0
+vidu_vpu_vid_fp_inst_dst_reg       out     6 5 640175 0
+vidu_vpu_vid_fp_inst_dst_vld       out     1 1 227481 0
+vidu_vpu_vid_fp_inst_dste_vld      out     1 1 94 0
+vidu_vpu_vid_fp_inst_dstf_reg      out     5 5 591545 0
+vidu_vpu_vid_fp_inst_dstf_vld      out     1 1 1164 0
+vidu_vpu_vid_fp_inst_eu            out    10 10 322767 0
+vidu_vpu_vid_fp_inst_func          out    20 19 541035 0
+vidu_vpu_vid_fp_inst_gateclk_vld   out     1 1 40 0
+vidu_vpu_vid_fp_inst_src1_data     out    64 64 507786 0
+vidu_vpu_vid_fp_inst_srcf0_data    out    64 64 7013 0
+vidu_vpu_vid_fp_inst_srcf1_data    out    64 64 8428 0
+vidu_vpu_vid_fp_inst_srcf2_data    out    64 64 8178 0
+vidu_vpu_vid_fp_inst_srcf2_rdy     out     1 0 0 0
+vidu_vpu_vid_fp_inst_srcf2_vld     out     1 1 338 0
+vidu_vpu_vid_fp_inst_vld           out     1 1 58 0
+vpu_rtu_ex1_cmplt                  out     1 1 36 0
+vpu_rtu_ex1_cmplt_dp               out     1 1 36 0
+vpu_rtu_ex1_fp_dirty               out     1 1 1178 0
+vpu_rtu_ex1_vec_dirty              out     1 1 2 0
+
+SUMMARY: 39/48 functional ports toggled (3 infrastructure ports excluded)
+X-SEEN : 0 functional ports held an X/Z bit at some point
+NEVER TOGGLED: cp0_idu_icg_en idu_vidu_ex1_vec_dp_sel idu_vidu_ex1_vec_gateclk_sel idu_vidu_ex1_vec_sel rtu_yy_xx_async_flush vpu_vidu_vex1_fp_stall vidu_cp0_vid_fof_vld vidu_idu_vec_full vidu_vpu_vid_fp_inst_srcf2_rdy

@@ -1,0 +1,34 @@
+// smart_run/setup/cov_units.vlt -- a Verilator configuration file.
+//
+// CAREFUL when editing: in a .vlt file a comment whose first word is
+// "verilator" is parsed as a metacomment pragma, not as prose, and Verilator
+// fails with BADVLTPRAGMA. Never start a comment line with that word here.
+//
+// Purpose: restrict coverage instrumentation to the five pipeline units. Only
+// used for COVERAGE=all (which adds --coverage-toggle), where instrumenting the
+// whole SoC -- including the two f_spsram_8388608x128 banks -- is genuinely
+// expensive.
+//
+// For COVERAGE=line this file is deliberately NOT used: line instrumentation of
+// the whole design is affordable, it is one compile that serves all four units,
+// and it lets an existing case (coremark) be measured for free.
+// cli_tools/cov_report.py filters per unit from the `f` (filename) field of each
+// coverage point, so no compile-time scoping is needed.
+//
+// CAVEAT to validate on first use: the override semantics of overlapping globs
+// ("*" then "*/gen_rtl/iu/rtl/*") go through the same ordered ignore-list
+// machinery as lint_off, and that a later narrower coverage_on wins has not been
+// confirmed against this build. Validation: run COVERAGE=all once with this file
+// and once without, and check that cov_report.py's per-unit toggle numbers
+// agree. If they do not, drop the file from the command line in Makefile and
+// accept the compile cost.
+
+`verilator_config
+
+coverage_off -file "*"
+
+coverage_on  -file "*/gen_rtl/ifu/rtl/*"
+coverage_on  -file "*/gen_rtl/idu/rtl/*"
+coverage_on  -file "*/gen_rtl/iu/rtl/*"
+coverage_on  -file "*/gen_rtl/vidu/rtl/*"
+coverage_on  -file "*/gen_rtl/cp0/rtl/*"

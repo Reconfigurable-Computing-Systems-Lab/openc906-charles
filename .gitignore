@@ -31,3 +31,6 @@ hhb/model/
 ._*
 .Spotlight-V100
 .Trashes
+
+# Coverage artifacts (COVERAGE=line|all)
+smart_run/cov/
